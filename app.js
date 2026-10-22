@@ -14,5 +14,47 @@ function info(title,message){$('infoTitle').textContent=title;$('infoMessage').t
 $('menuNotifications').addEventListener('click',()=>info('Notificaciones','Las notificaciones push no están activas en esta versión. Se implementarán al disponer de una fuente verificada y un sistema de suscripciones.'));
 $('menuHistory').addEventListener('click',()=>info('Historial','El historial estará disponible cuando se conecte el servicio de alertas. No se mostrarán eventos ficticios como reales.'));
 let installPrompt=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e});$('menuInstall').addEventListener('click',async()=>{if(installPrompt){installPrompt.prompt();await installPrompt.userChoice;installPrompt=null}else info('Instalar Alerta Salud','En Android, usá el menú del navegador y elegí Instalar app o Agregar a pantalla principal. En iPhone, abrí la web en Safari, tocá Compartir y elegí Agregar a inicio. Se requiere publicación por HTTPS para instalarla correctamente.')});
+
+// Lectura publica con RLS: no incluye claves privadas ni operaciones de escritura.
+async function fetchPublic(table,params=''){
+ const cfg=window.ALERTA_SUPABASE;
+ if(!cfg?.url||!cfg?.publishableKey)throw new Error('Configuración de Supabase incompleta');
+ const response=await fetch(`${cfg.url}/rest/v1/${table}?${params}`,{
+   headers:{'apikey':cfg.publishableKey,'Accept':'application/json'},
+   signal:AbortSignal.timeout(12000)
+ });
+ if(!response.ok)throw new Error(`Supabase HTTP ${response.status}`);
+ return response.json();
+}
+function renderDbMessage(message){const node=$('dbAlerts');if(node)node.textContent=message;}
+async function loadLocalidades(){
+ try{
+  const data=await fetchPublic('localidades','select=nombre,provincia&activa=eq.true&order=nombre.asc');
+  if(!Array.isArray(data)||!data.length)return;
+  const select=$('localidad');select.replaceChildren();
+  data.forEach(item=>{const option=document.createElement('option');option.value=item.nombre;option.textContent=`${item.nombre} (${item.provincia})`;select.append(option)});
+  if(!data.some(item=>item.nombre===place))place=data[0].nombre;
+  updatePlace();
+ }catch(error){console.warn('Localidades: no se pudo consultar Supabase',error)}
+}
+async function loadAlertas(){
+ renderDbMessage('Consultando alertas publicadas y vigentes…');
+ try{
+  const data=await fetchPublic('alertas','select=titulo,descripcion,tipo,nivel,inicio,fin,localidad_id,localidades(nombre)&estado=eq.publicada&order=inicio.desc&limit=50');
+  const matching=data.filter(a=>!a.localidad_id||a.localidades?.nombre===place);
+  const node=$('dbAlerts');node.replaceChildren();
+  if(!matching.length){renderDbMessage('No hay alertas publicadas para esta localidad en nuestra base de datos. Esto NO significa que no existan alertas oficiales. Consultá el SMN.');return;}
+  matching.forEach(a=>{
+   const article=document.createElement('article');article.style.cssText='padding:12px 0;border-bottom:1px solid #d7e1ea';
+   const heading=document.createElement('h3');heading.textContent=`${a.tipo==='oficial'?'Alerta oficial registrada':'Aviso preventivo'} · ${a.titulo}`;
+   const detail=document.createElement('p');detail.textContent=a.descripcion;
+   const meta=document.createElement('small');meta.textContent=`Nivel: ${a.nivel} · Inicio: ${new Date(a.inicio).toLocaleString('es-AR')} · Fuente y vigencia: consultar aviso original`;
+   article.append(heading,detail,meta);node.append(article);
+  });
+ }catch(error){renderDbMessage('No se pudo consultar Supabase. Verificá la conexión y consultá directamente las fuentes oficiales.');console.warn(error)}
+}
+loadLocalidades().then(loadAlertas);
+$('locationDialog').addEventListener('close',()=>{if($('locationDialog').returnValue==='save')loadAlertas()});
+
 if('serviceWorker'in navigator&&location.protocol!=='file:')window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 })();
