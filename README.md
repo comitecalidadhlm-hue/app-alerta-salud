@@ -16,3 +16,7 @@ Esta versión mantiene la app V1.2 y agrega el estado de integración y un enlac
 - En caso de fallo, mostrar datos no disponibles y enlace al SMN. No indicar «sin alertas» como sinónimo de «sin riesgo».
 
 El objetivo de costo $0 depende de mantenerse dentro de las cuotas gratuitas de Cloudflare y Supabase.
+
+
+## V1.6 - Mapa georreferenciado
+La pestaña Mapa consulta localidades y departamentos de Supabase y representa sus centroides con Leaflet/OpenStreetMap. Requiere conexión a Internet y permisos RLS SELECT. No representa alertas meteorológicas.
