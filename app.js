@@ -2,8 +2,8 @@
 const $=id=>document.getElementById(id);
 const places=[...$('localidad').options].map(o=>o.value);
 let place='Santa Rosa';try{const saved=localStorage.getItem('alertaSalud.localidad');if(places.includes(saved))place=saved}catch{}
-function updatePlace(){document.querySelectorAll('.current-location').forEach(el=>el.textContent=place);$('heroLocation').textContent=place;$('localidad').value=place}updatePlace();
-function show(view){if(!$('view-'+view))return;document.querySelectorAll('.view').forEach(el=>el.classList.toggle('active',el.id==='view-'+view));document.querySelectorAll('.nav-item').forEach(el=>{const active=el.dataset.view===view;el.classList.toggle('active',active);if(active)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current')});window.scrollTo({top:0,behavior:'instant'});}
+function updatePlace(){document.querySelectorAll('.current-location').forEach(el=>el.textContent=place);$('heroLocation').textContent=place;$('localidad').value=place;document.dispatchEvent(new CustomEvent('alerta:localidad',{detail:{nombre:place}}));}updatePlace();
+function show(view){if(!$('view-'+view))return;document.querySelectorAll('.view').forEach(el=>el.classList.toggle('active',el.id==='view-'+view));document.querySelectorAll('.nav-item').forEach(el=>{const active=el.dataset.view===view;el.classList.toggle('active',active);if(active)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current')});window.scrollTo({top:0,behavior:'instant'});document.dispatchEvent(new CustomEvent('alerta:view',{detail:{view}}));}
 document.querySelectorAll('[data-view]').forEach(el=>el.addEventListener('click',()=>show(el.dataset.view)));
 function openPlace(){$('localidad').value=place;$('locationDialog').showModal()}
 $('changeLocation').addEventListener('click',openPlace);$('menuLocation').addEventListener('click',openPlace);$('openSettings').addEventListener('click',()=>show('mas'));
@@ -65,5 +65,6 @@ async function loadSourceStatus(){
 loadLocalidades().then(loadAlertas);loadSourceStatus();
 $('locationDialog').addEventListener('close',()=>{if($('locationDialog').returnValue==='save')loadAlertas()});
 
+window.AlertaSalud={fetchPublic,getLocalidad:()=>place,seleccionarLocalidad:nombre=>{const select=$('localidad');if(![...select.options].some(o=>o.value===nombre))return false;place=nombre;try{localStorage.setItem('alertaSalud.localidad',place)}catch{}updatePlace();loadAlertas();return true}};
 if('serviceWorker'in navigator&&location.protocol!=='file:')window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 })();
