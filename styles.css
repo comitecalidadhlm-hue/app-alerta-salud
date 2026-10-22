@@ -8,3 +8,23 @@
 #territoryMap .leaflet-tile-pane img{max-width:none!important;max-height:none!important}
 #territoryMap .leaflet-container{font-family:inherit}
 #territoryMap{position:relative;overflow:hidden;isolation:isolate}
+
+/* V1.6.2: respaldo de geometría Leaflet ante bloqueo de CSS externo. */
+#territoryMap{position:relative;overflow:hidden;isolation:isolate;min-height:390px;touch-action:pan-x pan-y}
+#territoryMap .leaflet-pane,#territoryMap .leaflet-tile,#territoryMap .leaflet-marker-icon,#territoryMap .leaflet-marker-shadow,#territoryMap .leaflet-tile-container,#territoryMap .leaflet-pane>svg,#territoryMap .leaflet-pane>canvas{position:absolute;left:0;top:0}
+#territoryMap .leaflet-map-pane,#territoryMap .leaflet-tile-pane,#territoryMap .leaflet-overlay-pane,#territoryMap .leaflet-shadow-pane,#territoryMap .leaflet-marker-pane,#territoryMap .leaflet-tooltip-pane,#territoryMap .leaflet-popup-pane{position:absolute;inset:0}
+#territoryMap .leaflet-tile{width:256px;height:256px;max-width:none!important;max-height:none!important;margin:0;padding:0;border:0}
+#territoryMap .leaflet-tile-container{pointer-events:none}
+#territoryMap .leaflet-control-container{position:relative;z-index:800}
+#territoryMap .leaflet-top,#territoryMap .leaflet-bottom{position:absolute;z-index:1000;pointer-events:none}
+#territoryMap .leaflet-top{top:0}#territoryMap .leaflet-bottom{bottom:0}#territoryMap .leaflet-left{left:0}#territoryMap .leaflet-right{right:0}
+#territoryMap .leaflet-control{pointer-events:auto;position:relative;z-index:800}
+#territoryMap .leaflet-top .leaflet-control{margin-top:10px}#territoryMap .leaflet-left .leaflet-control{margin-left:10px}
+#territoryMap .leaflet-bottom .leaflet-control{margin-bottom:10px}#territoryMap .leaflet-right .leaflet-control{margin-right:10px}
+#territoryMap .leaflet-container img{max-width:none!important;max-height:none!important}
+#territoryMap .leaflet-pane>svg{max-width:none!important;max-height:none!important}
+#territoryMap .leaflet-popup{position:absolute;text-align:center;margin-bottom:20px}
+#territoryMap .leaflet-popup-content-wrapper{background:white;border-radius:10px;padding:1px;box-shadow:0 3px 14px #0003}
+#territoryMap .leaflet-popup-content{margin:13px 18px;line-height:1.4}
+#territoryMap .leaflet-popup-tip-container{display:none}
+#territoryMap .leaflet-control-attribution{background:#fffd;font-size:10px;padding:2px 5px}
