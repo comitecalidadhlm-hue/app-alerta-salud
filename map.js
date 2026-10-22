@@ -1,4 +1,4 @@
-/* App Alerta Salud V1.6 - Mapa de centroides oficiales. Sin alertas. */
+/* App Alerta Salud V1.6.2 - Mapa de centroides oficiales. Sin alertas. */
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
 let map=null,markers=new Map(),loaded=false,loading=false;
@@ -8,7 +8,7 @@ function focus(nombre){$('mapSelected').textContent='Localidad seleccionada: '+n
 async function init(){if(loaded||loading)return;loading=true;try{
  if(!window.L){status('No se pudo cargar el mapa. Verificá la conexión a internet.');return}
  const api=window.AlertaSalud;if(!api)throw new Error('La aplicación no está lista');
- map=L.map('territoryMap',{scrollWheelZoom:false}).setView([-36.6,-65],7);
+ map=L.map('territoryMap',{scrollWheelZoom:false,preferCanvas:true,zoomControl:false}).setView([-36.6,-65],7);
  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
  status('Consultando localidades georreferenciadas en Supabase…');
  const rows=await api.fetchPublic('localidades','select=nombre,provincia,latitud,longitud,codigo_georef,departamentos(nombre)&provincia=eq.La%20Pampa&activa=eq.true&order=nombre.asc');
@@ -20,8 +20,8 @@ async function init(){if(loaded||loading)return;loading=true;try{
  const item=document.createElement('button');item.type='button';item.textContent='📍 '+row.nombre;item.addEventListener('click',()=>select(row.nombre));list.append(item);
  }
  map.fitBounds(bounds,{padding:[25,25],maxZoom:9});loaded=true;status(`${valid.length} localidades ubicadas. Tocá un punto o elegí una localidad.`);focus(api.getLocalidad());
- }catch(error){console.warn('Mapa:',error);status('No fue posible consultar el mapa geográfico. Verificá la conexión y los permisos de Supabase.')}finally{loading=false;requestAnimationFrame(()=>requestAnimationFrame(()=>map?.invalidateSize()))}}
- document.addEventListener('alerta:view',event=>{if(event.detail.view==='mapa'){init();requestAnimationFrame(()=>requestAnimationFrame(()=>map?.invalidateSize()))}});
+ }catch(error){console.warn('Mapa:',error);status('No fue posible consultar el mapa geográfico. Verificá la conexión y los permisos de Supabase.')}finally{loading=false;requestAnimationFrame(()=>requestAnimationFrame(()=>map?.invalidateSize({pan:false})));setTimeout(()=>map?.invalidateSize({pan:false}),250)}}
+ document.addEventListener('alerta:view',event=>{if(event.detail.view==='mapa'){init();requestAnimationFrame(()=>requestAnimationFrame(()=>map?.invalidateSize({pan:false})));setTimeout(()=>map?.invalidateSize({pan:false}),250)}});
  window.addEventListener('resize',()=>{if(map)map.invalidateSize()});
  document.addEventListener('alerta:localidad',event=>{if(loaded)focus(event.detail.nombre)});
  if($('view-mapa')?.classList.contains('active'))init();
