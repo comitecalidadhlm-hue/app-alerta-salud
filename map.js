@@ -20,8 +20,9 @@ async function init(){if(loaded||loading)return;loading=true;try{
  const item=document.createElement('button');item.type='button';item.textContent='📍 '+row.nombre;item.addEventListener('click',()=>select(row.nombre));list.append(item);
  }
  map.fitBounds(bounds,{padding:[25,25],maxZoom:9});loaded=true;status(`${valid.length} localidades ubicadas. Tocá un punto o elegí una localidad.`);focus(api.getLocalidad());
- }catch(error){console.warn('Mapa:',error);status('No fue posible consultar el mapa geográfico. Verificá la conexión y los permisos de Supabase.')}finally{loading=false;setTimeout(()=>map?.invalidateSize(),150)}}
- document.addEventListener('alerta:view',event=>{if(event.detail.view==='mapa'){init();setTimeout(()=>map?.invalidateSize(),120)}});
+ }catch(error){console.warn('Mapa:',error);status('No fue posible consultar el mapa geográfico. Verificá la conexión y los permisos de Supabase.')}finally{loading=false;requestAnimationFrame(()=>requestAnimationFrame(()=>map?.invalidateSize()))}}
+ document.addEventListener('alerta:view',event=>{if(event.detail.view==='mapa'){init();requestAnimationFrame(()=>requestAnimationFrame(()=>map?.invalidateSize()))}});
+ window.addEventListener('resize',()=>{if(map)map.invalidateSize()});
  document.addEventListener('alerta:localidad',event=>{if(loaded)focus(event.detail.nombre)});
  if($('view-mapa')?.classList.contains('active'))init();
 })();
