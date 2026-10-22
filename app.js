@@ -40,7 +40,7 @@ async function loadLocalidades(){
 async function loadAlertas(){
  renderDbMessage('Consultando alertas publicadas y vigentes…');
  try{
-  const data=await fetchPublic('alertas','select=titulo,descripcion,tipo,nivel,inicio,fin,localidad_id,localidades(nombre)&estado=eq.publicada&order=inicio.desc&limit=50');
+  const data=await fetchPublic('alertas','select=titulo,descripcion,tipo,nivel,inicio,fin,localidad_id,url_fuente,fuentes_oficiales(nombre),localidades(nombre)&estado=eq.publicada&order=inicio.desc&limit=50');
   const matching=data.filter(a=>!a.localidad_id||a.localidades?.nombre===place);
   const node=$('dbAlerts');node.replaceChildren();
   if(!matching.length){renderDbMessage('No hay alertas publicadas para esta localidad en nuestra base de datos. Esto NO significa que no existan alertas oficiales. Consultá el SMN.');return;}
@@ -48,12 +48,21 @@ async function loadAlertas(){
    const article=document.createElement('article');article.style.cssText='padding:12px 0;border-bottom:1px solid #d7e1ea';
    const heading=document.createElement('h3');heading.textContent=`${a.tipo==='oficial'?'Alerta oficial registrada':'Aviso preventivo'} · ${a.titulo}`;
    const detail=document.createElement('p');detail.textContent=a.descripcion;
-   const meta=document.createElement('small');meta.textContent=`Nivel: ${a.nivel} · Inicio: ${new Date(a.inicio).toLocaleString('es-AR')} · Fuente y vigencia: consultar aviso original`;
-   article.append(heading,detail,meta);node.append(article);
+   const meta=document.createElement('small');meta.textContent=`Nivel: ${a.nivel} · Inicio: ${new Date(a.inicio).toLocaleString('es-AR')} · Fuente: ${a.fuentes_oficiales?.nombre||'No identificada'}`;
+   article.append(heading,detail,meta);if(a.url_fuente){try{const u=new URL(a.url_fuente);if(u.protocol==='https:'){const link=document.createElement('a');link.href=u.href;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Ver aviso original ↗';article.append(document.createElement('br'),link)}}catch{}}node.append(article);
   });
  }catch(error){renderDbMessage('No se pudo consultar Supabase. Verificá la conexión y consultá directamente las fuentes oficiales.');console.warn(error)}
 }
-loadLocalidades().then(loadAlertas);
+async function loadSourceStatus(){
+ const status=$('sourceStatus'),updated=$('sourceUpdated');
+ if(!status||!updated)return;
+ try{const rows=await fetchPublic('estado_fuentes','select=nombre,ultima_revision,ultima_revision_ok,detalle&nombre=eq.SMN&limit=1');
+ const item=rows?.[0];if(!item){status.textContent='Fuente SMN sin sincronización configurada';return;}
+ status.textContent=item.ultima_revision_ok?'Última revisión registrada (no garantiza cobertura completa)':'Integración no verificada o con errores';
+ updated.textContent=item.ultima_revision?'Última revisión: '+new Date(item.ultima_revision).toLocaleString('es-AR'):'Sin fecha de actualización confirmada';
+ }catch(e){status.textContent='No se pudo verificar el estado de la fuente';console.warn(e)}
+}
+loadLocalidades().then(loadAlertas);loadSourceStatus();
 $('locationDialog').addEventListener('close',()=>{if($('locationDialog').returnValue==='save')loadAlertas()});
 
 if('serviceWorker'in navigator&&location.protocol!=='file:')window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
