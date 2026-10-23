@@ -28,3 +28,15 @@
 #territoryMap .leaflet-popup-content{margin:13px 18px;line-height:1.4}
 #territoryMap .leaflet-popup-tip-container{display:none}
 #territoryMap .leaflet-control-attribution{background:#fffd;font-size:10px;padding:2px 5px}
+
+/* V1.6.3 — navegación territorial compacta */
+.map-controls{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end;margin:12px 0}
+.map-controls label{grid-column:1/-1;font-size:12px;font-weight:750;color:#314e6a}
+.map-controls select{min-width:0;width:100%;min-height:44px;padding:10px;border:1px solid #b8ccdf;border-radius:11px;background:white;color:#173a59;font:inherit;font-size:13px}
+.map-controls button{min-height:44px;padding:9px 12px;white-space:nowrap;font-size:12px}
+#mapDetails{font-size:12px;color:#395c79;line-height:1.5;margin:7px 0}
+#territoryMap{height:340px;min-height:340px}
+@media(max-width:390px){.map-controls{grid-template-columns:1fr}.map-controls button{width:100%}}
+
+/* V1.7 — directorio asistencial: sin colores que aparenten verificación */
+.care-directory{margin:18px 0;padding:15px;border:1px solid #dce6ef;border-radius:15px;background:#fff}.care-directory h2{margin:0 0 8px;font-size:1.12rem}.care-list{display:grid;gap:10px;margin-top:12px}.care-item{border:1px solid #d9e3ec;border-radius:12px;padding:12px;background:#f8fbfd}.care-item h3{font-size:1rem;margin:0 0 6px}.care-item p{margin:4px 0;font-size:.89rem}.care-item .care-tag{display:inline-block;padding:3px 8px;border-radius:20px;background:#e7edf3;color:#23374a;font-size:.8rem;font-weight:700}.care-note{font-size:.8rem;color:#506173;margin-top:12px}.care-directory .subtitle{margin:4px 0 10px}
