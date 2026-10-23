@@ -1,0 +1,15 @@
+/* V1.7.0 — consulta pública de establecimientos; nunca deducir disponibilidad. */
+(()=>{'use strict';
+const $=id=>document.getElementById(id);
+let request=0;
+const label={operativo:'Operativo verificado',parcial:'Atención parcial verificada',suspendido:'Atención suspendida verificada',accesible:'Acceso verificado',restringido:'Acceso restringido verificado',interrumpido:'Acceso interrumpido verificado',normal:'Suministro normal verificado',afectado:'Suministro afectado verificado',sin_servicio:'Suministro interrumpido verificado',sin_verificar:'Sin verificar'};
+function field(row,key){const raw=row[key]||'sin_verificar';const verified=row.verificado_hasta&&new Date(row.verificado_hasta)>new Date()&&row.validado===true;return verified?(label[raw]||'Sin verificar'):'Sin verificar';}
+function line(parent,title,value){const p=document.createElement('p');const b=document.createElement('b');b.textContent=title+': ';p.append(b,document.createTextNode(value));parent.append(p);}
+async function load(){const api=window.AlertaSalud,box=$('careList'),status=$('careStatus');if(!api||!box)return;const id=++request,localidad=api.getLocalidad();box.replaceChildren();status.textContent='Consultando centros asistenciales de '+localidad+'…';try{
+const rows=await api.fetchPublic('centros_asistenciales','select=id,nombre,tipo,direccion,localidad,latitud,longitud,estado_actual(operatividad,accesibilidad,energia,validado,verificado_hasta)&activo=eq.true&localidad=eq.'+encodeURIComponent(localidad)+'&order=nombre.asc');if(id!==request)return;
+if(!rows.length){status.textContent='Todavía no hay establecimientos incorporados para '+localidad+'. Esto no significa que no existan centros asistenciales.';return;}
+status.textContent=rows.length+' establecimiento(s) registrados en '+localidad+'.';
+for(const row of rows){const card=document.createElement('article');card.className='care-item';const h=document.createElement('h3');h.textContent='🏥 '+row.nombre;card.append(h);line(card,'Tipo',row.tipo||'No informado');line(card,'Dirección',row.direccion||'No informada');const state=Array.isArray(row.estado_actual)?row.estado_actual[0]:row.estado_actual||{};line(card,'Atención',field(state,'operatividad'));line(card,'Acceso',field(state,'accesibilidad'));line(card,'Energía',field(state,'energia'));if(Number.isFinite(row.latitud)&&Number.isFinite(row.longitud)){const a=document.createElement('a');a.href='https://www.openstreetmap.org/?mlat='+row.latitud+'&mlon='+row.longitud+'#map=16/'+row.latitud+'/'+row.longitud;a.target='_blank';a.rel='noopener noreferrer';a.textContent='Ver ubicación ↗';card.append(a);}box.append(card);}
+}catch(e){if(id!==request)return;status.textContent='No fue posible verificar el directorio asistencial. La información de disponibilidad no está confirmada.';console.warn('Red asistencial',e);}}
+document.addEventListener('alerta:view',e=>{if(e.detail.view==='mapa')load()});document.addEventListener('alerta:localidad',()=>{if($('view-mapa')?.classList.contains('active'))load()});if($('view-mapa')?.classList.contains('active'))load();
+})();
