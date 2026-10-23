@@ -43,3 +43,6 @@
 
 /* V1.7.1 — respaldo ligero sin teselas */
 .map-mode{display:flex;justify-content:flex-end;margin:0 0 10px}.map-mode button{font-size:12px}.map-light-view{display:none;background:#e8f2ee;padding:10px}.map-light-view svg{width:100%;height:auto;display:block}.map-light-view p{font-size:12px;color:#415b6e;margin:7px 0}#territoryMap.map-light{display:none!important}#territoryMap.map-light + #mapLightView{display:block!important}
+
+/* V1.8 — listado sanitario filtrable */
+.care-filter-row{display:grid;gap:6px;margin:12px 0}.care-filter-row label{font-size:12px;font-weight:750;color:#314e6a}.care-filter-row select{width:100%;min-height:43px;border:1px solid #b8ccdf;border-radius:10px;padding:9px;background:#fff;color:#173a59;font:inherit;font-size:13px}.care-summary{font-size:12px;color:#53677c;margin:8px 0}.care-item .care-tag{margin-bottom:8px}.care-item a{display:inline-block;margin-top:9px;font-size:13px;font-weight:700;color:#1266ba}.care-item p{line-height:1.45}.care-empty{font-size:13px;color:#53677c}
