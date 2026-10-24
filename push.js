@@ -1,17 +1,18 @@
 
 /*
- * APP ALERTA SALUD V1.10.9
- * Web Push - Integración compacta
+ * APP ALERTA SALUD V1.10.10
+ * Web Push - Interfaz compacta corregida
  *
  * Archivo: push.js
  * Acción: REEMPLAZAR COMPLETO
  *
- * La configuración se integra en
- * .as-notification-actions.
+ * La configuración se integra en la barra
+ * existente del Centro de Notificaciones.
  *
- * No modifica publicaciones institucionales.
- * Registro real desactivado hasta completar
- * las pruebas de seguridad.
+ * El desplegable ocupa todo el ancho.
+ * No se crean tarjetas adicionales.
+ *
+ * TEST_MODE permanece activado.
  */
 
 (() => {
@@ -173,7 +174,7 @@
     try {
       result = await response.json();
     } catch {
-      // Se conserva el error HTTP.
+      // Conserva el error HTTP.
     }
 
     if (!response.ok) {
@@ -377,17 +378,52 @@
     }
 
     /*
-     * Se integra dentro de la barra
-     * de acciones ya existente.
+     * La barra tendrá dos filas:
+     *
+     * 1. Botones compactos.
+     * 2. Configuración expandida a todo el ancho.
+     *
+     * No se crea un módulo adicional.
      */
+
+    actions.style.cssText += [
+      ";display:grid",
+      "grid-template-columns:minmax(0,1fr) minmax(0,1fr)",
+      "column-gap:8px",
+      "row-gap:0",
+      "align-items:start"
+    ].join(";");
+
+    const reloadButton =
+      actions.querySelector("#asNotReload");
+
+    if (reloadButton) {
+      reloadButton.style.cssText += [
+        ";width:100%",
+        "min-width:0",
+        "min-height:38px",
+        "margin:0",
+        "font-size:11px",
+        "padding:8px 5px"
+      ].join(";");
+    }
 
     const details = element("details");
     details.id = "asPushPreferences";
 
+    /*
+     * display:contents permite que summary
+     * y contenido participen directamente
+     * de la grilla visual.
+     *
+     * Para mantener el comportamiento nativo
+     * de details, usamos en cambio un contenedor
+     * de dos columnas y expandimos el contenido
+     * mediante una fila independiente.
+     */
+
     details.style.cssText = [
-      "width:100%",
-      "margin:0",
-      "padding:0"
+      "display:contents"
     ].join(";");
 
     const summary = element(
@@ -398,17 +434,34 @@
     summary.style.cssText = [
       "cursor:pointer",
       "font-weight:600",
-      "font-size:12px",
-      "padding:8px 10px",
+      "font-size:11px",
+      "padding:8px 5px",
+      "min-height:38px",
       "border:1px solid #c5d4e2",
       "border-radius:8px",
       "background:#eef3f8",
-      "color:#16344d"
+      "color:#16344d",
+      "display:flex",
+      "align-items:center",
+      "justify-content:center",
+      "gap:4px",
+      "text-align:center"
     ].join(";");
 
+    /*
+     * El contenido se coloca en un contenedor
+     * independiente que ocupa las dos columnas.
+     */
+
     const content = element("div");
+    content.id = "asPushContent";
+
+    content.hidden = true;
 
     content.style.cssText = [
+      "grid-column:1 / -1",
+      "width:100%",
+      "min-width:0",
       "padding:10px 0 2px",
       "font-size:12px"
     ].join(";");
@@ -480,36 +533,98 @@
       buttons
     );
 
-    details.append(
-      summary,
-      content
+    /*
+     * La fila superior contiene el botón
+     * existente y el nuevo desplegable.
+     *
+     * La segunda fila ocupa todo el ancho.
+     */
+
+    details.append(summary);
+
+    actions.append(details, content);
+
+    /*
+     * Configuración visual de las dos filas.
+     */
+
+    details.style.gridColumn = "2";
+    summary.setAttribute(
+      "aria-controls",
+      "asPushContent"
+    );
+
+    summary.setAttribute(
+      "aria-expanded",
+      "false"
     );
 
     /*
-     * Reutiliza la barra existente.
-     * No crea una tarjeta independiente.
+     * Controlamos explícitamente el contenido
+     * para que no quede limitado al ancho
+     * de la segunda columna.
      */
 
-    actions.append(details);
+    let initialized = false;
+    let initializing = false;
 
-    /*
-     * Ajuste compacto de la barra.
-     * Mantiene el botón de actualización.
-     */
+    function syncOpenState() {
+      const open = details.open;
 
-    actions.style.display = "flex";
-    actions.style.flexWrap = "wrap";
-    actions.style.alignItems = "flex-start";
-    actions.style.gap = "8px";
+      content.hidden = !open;
 
-    details.style.flex = "1 1 150px";
+      summary.setAttribute(
+        "aria-expanded",
+        String(open)
+      );
+    }
+
+    details.addEventListener(
+      "toggle",
+      async () => {
+        syncOpenState();
+
+        if (
+          !details.open ||
+          initialized ||
+          initializing
+        ) {
+          return;
+        }
+
+        initializing = true;
+        setBusy(true);
+
+        try {
+          await loadCenters();
+
+          renderCenters();
+
+          if (TEST_MODE) {
+            status.textContent =
+              "Vista previa: la activación estará " +
+              "disponible después de las pruebas.";
+          } else {
+            await update();
+          }
+
+          initialized = true;
+
+        } catch (error) {
+          status.textContent =
+            error.message;
+        } finally {
+          initializing = false;
+          setBusy(false);
+        }
+      }
+    );
 
     if (!supported()) {
       status.textContent =
         "Este navegador no admite Web Push.";
 
       buttons.hidden = true;
-      return;
     }
 
     if (!configured()) {
@@ -517,7 +632,6 @@
         "Las notificaciones están en preparación.";
 
       buttons.hidden = true;
-      return;
     }
 
     function renderCenters() {
@@ -541,11 +655,13 @@
           "display:flex",
           "align-items:center",
           "gap:8px",
-          "padding:7px 8px",
+          "padding:9px 10px",
           "border:1px solid #e2e8f0",
           "border-radius:7px",
           "font-size:12px",
-          "cursor:pointer"
+          "cursor:pointer",
+          "width:100%",
+          "box-sizing:border-box"
         ].join(";");
 
         const checkbox =
@@ -677,47 +793,8 @@
       }
     );
 
-    let initialized = false;
-    let initializing = false;
-
-    details.addEventListener(
-      "toggle",
-      async () => {
-        if (
-          !details.open ||
-          initialized ||
-          initializing
-        ) {
-          return;
-        }
-
-        initializing = true;
-        setBusy(true);
-
-        try {
-          await loadCenters();
-
-          renderCenters();
-
-          if (TEST_MODE) {
-            status.textContent =
-              "Vista previa: la activación estará " +
-              "disponible después de las pruebas.";
-          } else {
-            await update();
-          }
-
-          initialized = true;
-
-        } catch (error) {
-          status.textContent =
-            error.message;
-        } finally {
-          initializing = false;
-          setBusy(false);
-        }
-      }
-    );
+    syncOpenState();
+    setBusy(false);
   }
 
   mount();
