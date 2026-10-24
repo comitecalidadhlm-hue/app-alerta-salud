@@ -1,173 +1,240 @@
 
 /*
- * APP ALERTA SALUD V1.9
- * Módulo institucional
+ * APP ALERTA SALUD V1.9.1
+ * CODIGO 12 - PANEL INSTITUCIONAL
  *
- * Requiere:
- * - supabase-config.js
- * - tablas y funciones SQL de la V1.9
+ * Funciones:
+ * - Acceso institucional
+ * - Solicitudes reales y de prueba
+ * - Respuesta institucional
+ * - Validacion de reportes
+ * - Publicacion supervisada
  *
- * No publica estados directamente.
- * No envía notificaciones push ni SMS.
+ * Requiere las funciones SQL:
+ * as_crear_solicitud_real
+ * as_responder_solicitud
+ * as_validar_reporte
+ * as_publicar_reporte
+ *
+ * No envia correos, SMS ni notificaciones push.
  */
 
 (() => {
   "use strict";
 
   const cfg = window.ALERTA_SUPABASE;
-  if (!cfg?.url || !cfg?.publishableKey) return;
+  const host = document.getElementById("view-mas");
 
-  const $ = id => document.getElementById(id);
+  if (!cfg?.url || !cfg?.publishableKey || !host) {
+    return;
+  }
+
   const API = cfg.url.replace(/\/$/, "");
 
-  let accessToken = null;
-  let perfil = null;
+  let token = null;
   let usuario = null;
+  let perfil = null;
 
-  const style = document.createElement("style");
-  style.textContent = `
-    .as-box {
+  const $ = id => document.getElementById(id);
+
+  const css = document.createElement("style");
+
+  css.textContent = `
+    .as-panel {
+      background: #fff;
       border: 1px solid #d7e1ea;
       border-radius: 14px;
-      padding: 16px;
-      margin: 16px 0;
-      background: #fff;
+      padding: 15px;
+      margin: 18px 0;
       color: #172b3a;
     }
-    .as-box h2, .as-box h3 {
+
+    .as-panel h2,
+    .as-panel h3 {
       margin: 0 0 12px;
     }
-    .as-box p { line-height: 1.5; }
+
+    .as-panel p {
+      line-height: 1.5;
+    }
+
     .as-field {
       display: block;
       width: 100%;
       box-sizing: border-box;
+      margin: 6px 0 13px;
       padding: 11px;
-      margin: 6px 0 12px;
       border: 1px solid #aebdca;
       border-radius: 8px;
       background: white;
       color: #172b3a;
       font: inherit;
     }
-    .as-button {
-      display: inline-block;
-      padding: 10px 14px;
-      margin: 4px 6px 4px 0;
+
+    .as-label {
+      display: block;
+      margin-top: 10px;
+      font-weight: 600;
+    }
+
+    .as-btn {
+      padding: 10px 13px;
+      margin: 4px 5px 4px 0;
       border: 0;
       border-radius: 8px;
       background: #14618b;
       color: white;
-      cursor: pointer;
       font: inherit;
+      cursor: pointer;
     }
-    .as-button:disabled {
+
+    .as-btn:disabled {
       opacity: .55;
       cursor: wait;
     }
-    .as-secondary { background: #475569; }
-    .as-danger { background: #a72b35; }
+
+    .as-secondary {
+      background: #475569;
+    }
+
+    .as-danger {
+      background: #a72b35;
+    }
+
     .as-notice {
-      padding: 10px;
-      border-radius: 8px;
-      background: #edf5fb;
+      padding: 11px;
       margin: 12px 0;
+      background: #edf5fb;
+      border-radius: 8px;
       white-space: pre-wrap;
     }
+
     .as-card {
-      border: 1px solid #d7e1ea;
-      border-radius: 10px;
       padding: 12px;
       margin: 12px 0;
+      border: 1px solid #d7e1ea;
+      border-radius: 10px;
     }
+
+    .as-card h4 {
+      margin: 0 0 8px;
+    }
+
+    .as-card p {
+      margin: 7px 0;
+    }
+
     .as-card small {
       display: block;
       margin: 6px 0;
       color: #526577;
     }
+
+    .as-tag {
+      display: inline-block;
+      padding: 4px 8px;
+      margin: 5px 0;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .as-test {
+      background: #e5e7eb;
+      color: #374151;
+    }
+
+    .as-real {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
+    .as-section {
+      margin-top: 20px;
+      padding-top: 14px;
+      border-top: 1px solid #d7e1ea;
+    }
+
     .as-actions {
       display: flex;
       flex-wrap: wrap;
-      gap: 6px;
+      gap: 5px;
     }
-    .as-hidden { display: none !important; }
   `;
-  document.head.appendChild(style);
 
-  function element(tag, text, className) {
-    const el = document.createElement(tag);
+  document.head.append(css);
+
+  function el(tag, text, className) {
+    const node = document.createElement(tag);
+
     if (text !== undefined && text !== null) {
-      el.textContent = String(text);
+      node.textContent = String(text);
     }
-    if (className) el.className = className;
-    return el;
+
+    if (className) node.className = className;
+
+    return node;
   }
 
-  function button(text, callback, extraClass = "") {
-    const el = element(
-      "button",
-      text,
-      `as-button ${extraClass}`
-    );
-    el.type = "button";
-    el.addEventListener("click", callback);
-    return el;
+  function btn(text, callback, className = "") {
+    const node = el("button", text, `as-btn ${className}`);
+    node.type = "button";
+    node.addEventListener("click", callback);
+    return node;
   }
 
-  function field(label, type = "text") {
-    const wrapper = element("label");
-    wrapper.append(element("span", label));
+  function input(label, type = "text") {
+    const wrap = el("label", null, "as-label");
+    wrap.append(el("span", label));
 
-    const input = element("input");
-    input.type = type;
-    input.className = "as-field";
-    input.required = true;
+    const node = el("input", null, "as-field");
+    node.type = type;
+    node.required = true;
 
-    wrapper.append(input);
-    return { wrapper, input };
+    wrap.append(node);
+
+    return { wrap, node };
   }
 
-  function selectField(label, options) {
-    const wrapper = element("label");
-    wrapper.append(element("span", label));
+  function select(label, options) {
+    const wrap = el("label", null, "as-label");
+    wrap.append(el("span", label));
 
-    const select = element("select");
-    select.className = "as-field";
+    const node = el("select", null, "as-field");
 
-    options.forEach(([value, text]) => {
-      const option = element("option", text);
+    for (const [value, text] of options) {
+      const option = el("option", text);
       option.value = value;
-      select.append(option);
-    });
+      node.append(option);
+    }
 
-    wrapper.append(select);
-    return { wrapper, select };
-  }
+    wrap.append(node);
 
-  function notice(message) {
-    $("as-message").textContent = message;
+    return { wrap, node };
   }
 
   function dateText(value) {
     if (!value) return "Sin fecha";
+
     const date = new Date(value);
+
     return Number.isNaN(date.getTime())
       ? "Fecha no disponible"
       : date.toLocaleString("es-AR");
   }
 
-  async function request(path, options = {}) {
+  async function api(path, options = {}) {
     const headers = {
       apikey: cfg.publishableKey,
       Accept: "application/json",
       ...(options.headers || {})
     };
 
-    if (accessToken) {
-      headers.Authorization = `Bearer ${accessToken}`;
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API}${path}`, {
+    const response = await fetch(API + path, {
       ...options,
       headers,
       cache: "no-store"
@@ -189,11 +256,11 @@
   }
 
   async function rest(table, query) {
-    return request(`/rest/v1/${table}?${query}`);
+    return api(`/rest/v1/${table}?${query}`);
   }
 
   async function rpc(name, args) {
-    return request(`/rest/v1/rpc/${name}`, {
+    return api(`/rest/v1/rpc/${name}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -202,63 +269,73 @@
     });
   }
 
-  const container = element("section", null, "as-box");
-  container.id = "as-container";
+  const panel = el("section", null, "as-panel");
+  const title = el("h2", "Acceso institucional");
+  const message = el("div", "", "as-notice");
+  const content = el("div");
 
-  const title = element("h2", "Acceso institucional");
-  const message = element("div", "", "as-notice");
-  message.id = "as-message";
   message.setAttribute("role", "status");
 
-  const content = element("div");
-  content.id = "as-content";
+  panel.append(title, message, content);
+  host.append(panel);
 
-  container.append(title, message, content);
-
-  // La sección se agrega en "Más opciones".
-  // No aparece en la navegación pública principal.
-  const more = $("view-mas");
-  if (!more) return;
-  more.append(container);
+  function notice(text) {
+    message.textContent = text;
+  }
 
   function clear() {
     content.replaceChildren();
   }
 
+  function badge(isTest) {
+    return el(
+      "span",
+      isTest ? "MODO PRUEBA" : "SOLICITUD REAL",
+      `as-tag ${isTest ? "as-test" : "as-real"}`
+    );
+  }
+
+  function logout() {
+    token = null;
+    usuario = null;
+    perfil = null;
+    showLogin();
+  }
+
   function showLogin() {
     clear();
+
     title.textContent = "Acceso institucional";
+
     notice(
       "Ingreso exclusivo para administradores autorizados."
     );
 
-    const form = element("form");
-    const email = field("Correo electrónico", "email");
-    const password = field("Contraseña", "password");
+    const form = el("form");
 
-    email.input.autocomplete = "username";
-    password.input.autocomplete = "current-password";
+    const email = input("Correo electrónico", "email");
+    const password = input("Contraseña", "password");
 
-    const submit = element(
-      "button",
-      "Ingresar",
-      "as-button"
-    );
+    email.node.autocomplete = "username";
+    password.node.autocomplete = "current-password";
+
+    const submit = el("button", "Ingresar", "as-btn");
     submit.type = "submit";
 
     form.append(
-      email.wrapper,
-      password.wrapper,
+      email.wrap,
+      password.wrap,
       submit
     );
 
     form.addEventListener("submit", async event => {
       event.preventDefault();
+
       submit.disabled = true;
-      notice("Verificando credenciales…");
+      notice("Verificando credenciales...");
 
       try {
-        const session = await request(
+        const session = await api(
           "/auth/v1/token?grant_type=password",
           {
             method: "POST",
@@ -266,18 +343,18 @@
               "Content-Type": "application/json"
             },
             body: JSON.stringify({
-              email: email.input.value.trim(),
-              password: password.input.value
+              email: email.node.value.trim(),
+              password: password.node.value
             })
           }
         );
 
-        accessToken = session.access_token;
+        token = session.access_token;
         usuario = session.user;
 
         const rows = await rest(
           "as_perfiles",
-          "select=usuario_id,rol,nombre,activo" +
+          "select=usuario_id,nombre,rol,activo" +
           "&usuario_id=eq." +
           encodeURIComponent(usuario.id) +
           "&limit=1"
@@ -294,11 +371,12 @@
           );
         }
 
-        password.input.value = "";
-        await showDashboard();
+        password.node.value = "";
+
+        await dashboard();
 
       } catch (error) {
-        accessToken = null;
+        token = null;
         usuario = null;
         perfil = null;
         notice(error.message);
@@ -310,64 +388,34 @@
     content.append(form);
   }
 
-  function logout() {
-    accessToken = null;
-    perfil = null;
-    usuario = null;
-    showLogin();
-  }
-
-  async function showDashboard() {
-    if (!accessToken || !perfil) {
+  async function dashboard() {
+    if (!token || !perfil) {
       showLogin();
       return;
     }
 
     clear();
+
     title.textContent = "Panel institucional";
 
-    const roleName = perfil.rol === "superadmin"
-      ? "Superadmin"
-      : "Administrador institucional";
+    const isSuper = perfil.rol === "superadmin";
 
     notice(
-      `${perfil.nombre || "Usuario"} · ${roleName}\n` +
-      "Los estados públicos no cambian hasta su validación."
+      `${perfil.nombre || "Usuario"} · ` +
+      `${isSuper ? "Superadmin" : "Administrador"}\n` +
+      "Los estados públicos requieren aprobación y publicación."
     );
 
-    const actions = element("div", null, "as-actions");
+    const actions = el("div", null, "as-actions");
 
     actions.append(
-      button("Actualizar", showDashboard),
-      button("Cerrar sesión", logout, "as-secondary")
+      btn("Actualizar", dashboard),
+      btn("Cerrar sesión", logout, "as-secondary")
     );
 
     content.append(actions);
 
-    const requestsBox = element("div", null, "as-box");
-    requestsBox.append(
-      element("h3", "Solicitudes pendientes")
-    );
-    content.append(requestsBox);
-
     try {
-      let query =
-        "select=id,centro_id,motivo,estado,mensaje," +
-        "creada_en,destinatario_id" +
-        "&estado=eq.pendiente" +
-        "&order=creada_en.desc" +
-        "&limit=100";
-
-      if (perfil.rol !== "superadmin") {
-        query += "&destinatario_id=eq." +
-          encodeURIComponent(usuario.id);
-      }
-
-      const solicitudes = await rest(
-        "as_solicitudes_verificacion",
-        query
-      );
-
       const centros = await rest(
         "centros_asistenciales",
         "select=id,nombre&order=nombre.asc"
@@ -377,60 +425,263 @@
         centros.map(c => [String(c.id), c.nombre])
       );
 
-      if (!solicitudes.length) {
-        requestsBox.append(
-          element("p", "No hay solicitudes pendientes.")
-        );
+      if (isSuper) {
+        await showCreateRequest(centros);
       }
 
-      for (const solicitud of solicitudes) {
-        const card = element("article", null, "as-card");
+      await showRequests(nombres);
 
-        card.append(
-          element(
-            "h3",
-            nombres.get(solicitud.centro_id) ||
-            `Establecimiento ${solicitud.centro_id}`
-          ),
-          element(
-            "small",
-            `Solicitud: ${dateText(solicitud.creada_en)}`
-          ),
-          element(
-            "p",
-            solicitud.mensaje ||
-            "Se solicita verificar el estado institucional."
-          )
-        );
-
-        if (solicitud.destinatario_id === usuario.id) {
-          card.append(
-            button(
-              "Responder solicitud",
-              () => showResponse(solicitud, nombres)
-            )
-          );
-        } else {
-          card.append(
-            element(
-              "small",
-              "Asignada a otro administrador."
-            )
-          );
-        }
-
-        requestsBox.append(card);
-      }
-
-      if (perfil.rol === "superadmin") {
+      if (isSuper) {
         await showValidations(nombres);
+        await showPublications(nombres);
       }
 
     } catch (error) {
-      notice(
-        "No se pudieron cargar los datos: " +
-        error.message
+      notice("Error al cargar el panel: " + error.message);
+    }
+  }
+
+  async function showCreateRequest(centros) {
+    const box = el("section", null, "as-section");
+
+    box.append(
+      el("h3", "Solicitar verificación institucional"),
+      el(
+        "p",
+        "Esta función genera una solicitud REAL. " +
+        "Usala únicamente cuando se necesite información " +
+        "efectiva del establecimiento."
+      )
+    );
+
+    const asignaciones = await rest(
+      "as_asignaciones",
+      "select=centro_id,usuario_id,activo" +
+      "&activo=eq.true"
+    );
+
+    const perfiles = await rest(
+      "as_perfiles",
+      "select=usuario_id,nombre,rol,activo" +
+      "&activo=eq.true"
+    );
+
+    const administradores = new Map(
+      perfiles
+        .filter(p => ["admin", "superadmin"].includes(p.rol))
+        .map(p => [p.usuario_id, p])
+    );
+
+    const opcionesCentro = [
+      ["", "Seleccionar establecimiento"]
+    ];
+
+    for (const centro of centros) {
+      opcionesCentro.push([
+        String(centro.id),
+        centro.nombre
+      ]);
+    }
+
+    const centro = select(
+      "Establecimiento",
+      opcionesCentro
+    );
+
+    const destinatario = select(
+      "Administrador responsable",
+      [["", "Seleccionar administrador"]]
+    );
+
+    function updateDestinatarios() {
+      destinatario.node.replaceChildren();
+
+      const initial = el(
+        "option",
+        "Seleccionar administrador"
       );
+
+      initial.value = "";
+      destinatario.node.append(initial);
+
+      const ids = new Set(
+        asignaciones
+          .filter(a =>
+            String(a.centro_id) === centro.node.value &&
+            a.activo === true
+          )
+          .map(a => a.usuario_id)
+      );
+
+      for (const id of ids) {
+        const admin = administradores.get(id);
+        if (!admin) continue;
+
+        const option = el(
+          "option",
+          `${admin.nombre || "Administrador"} (${admin.rol})`
+        );
+
+        option.value = id;
+        destinatario.node.append(option);
+      }
+    }
+
+    centro.node.addEventListener(
+      "change",
+      updateDestinatarios
+    );
+
+    const label = el("label", null, "as-label");
+
+    label.append(
+      el("span", "Mensaje institucional")
+    );
+
+    const mensaje = el("textarea", null, "as-field");
+
+    mensaje.rows = 4;
+    mensaje.minLength = 15;
+    mensaje.maxLength = 2000;
+    mensaje.required = true;
+
+    mensaje.value =
+      "Se solicita verificar el funcionamiento, " +
+      "la recepción de pacientes, la accesibilidad " +
+      "y las acciones de respuesta del establecimiento.";
+
+    label.append(mensaje);
+
+    const send = btn(
+      "Enviar solicitud real",
+      async () => {
+        if (!centro.node.value) {
+          notice("Seleccioná un establecimiento.");
+          return;
+        }
+
+        if (!destinatario.node.value) {
+          notice("Seleccioná un administrador asignado.");
+          return;
+        }
+
+        const texto = mensaje.value.trim();
+
+        if (texto.length < 15 || texto.length > 2000) {
+          notice("El mensaje debe tener entre 15 y 2000 caracteres.");
+          return;
+        }
+
+        const nombre = centro.node.selectedOptions[0].textContent;
+
+        if (!window.confirm(
+          "ATENCIÓN: vas a crear una solicitud REAL para " +
+          nombre +
+          ".\n\n¿Confirmás que corresponde a una necesidad real?"
+        )) return;
+
+        send.disabled = true;
+
+        try {
+          await rpc("as_crear_solicitud_real", {
+            p_centro_id: centro.node.value,
+            p_destinatario_id: destinatario.node.value,
+            p_mensaje: texto
+          });
+
+          await dashboard();
+
+          notice(
+            "Solicitud REAL registrada correctamente. " +
+            "Está disponible en la bandeja institucional. " +
+            "No se envió un correo ni una notificación push."
+          );
+
+        } catch (error) {
+          notice("No se pudo crear: " + error.message);
+          send.disabled = false;
+        }
+      }
+    );
+
+    box.append(
+      centro.wrap,
+      destinatario.wrap,
+      label,
+      send
+    );
+
+    content.append(box);
+  }
+
+  async function showRequests(nombres) {
+    const box = el("section", null, "as-section");
+
+    box.append(
+      el("h3", "Solicitudes pendientes")
+    );
+
+    content.append(box);
+
+    let query =
+      "select=id,centro_id,destinatario_id," +
+      "estado,mensaje,creada_en,es_prueba" +
+      "&estado=eq.pendiente" +
+      "&order=creada_en.desc&limit=100";
+
+    if (perfil.rol !== "superadmin") {
+      query +=
+        "&destinatario_id=eq." +
+        encodeURIComponent(usuario.id);
+    }
+
+    const solicitudes = await rest(
+      "as_solicitudes_verificacion",
+      query
+    );
+
+    if (!solicitudes.length) {
+      box.append(
+        el("p", "No hay solicitudes pendientes.")
+      );
+      return;
+    }
+
+    for (const solicitud of solicitudes) {
+      const card = el("article", null, "as-card");
+
+      card.append(
+        el(
+          "h4",
+          nombres.get(String(solicitud.centro_id)) ||
+          `Establecimiento ${solicitud.centro_id}`
+        ),
+        badge(solicitud.es_prueba),
+        el(
+          "small",
+          `Solicitada: ${dateText(solicitud.creada_en)}`
+        ),
+        el(
+          "p",
+          solicitud.mensaje ||
+          "Se solicita verificar el estado institucional."
+        )
+      );
+
+      if (solicitud.destinatario_id === usuario.id) {
+        card.append(
+          btn(
+            "Responder solicitud",
+            () => showResponse(solicitud, nombres)
+          )
+        );
+      } else {
+        card.append(
+          el("small", "Asignada a otro administrador.")
+        );
+      }
+
+      box.append(card);
     }
   }
 
@@ -438,20 +689,22 @@
     clear();
 
     title.textContent = "Reporte institucional";
+
     notice(
-      "Completá la situación real del establecimiento. " +
-      "No utilices datos de prueba como si fueran reales."
+      solicitud.es_prueba
+        ? "MODO PRUEBA: este reporte no se publicará."
+        : "SOLICITUD REAL: informá únicamente datos comprobados."
     );
 
-    const heading = element(
+    const form = el("form");
+
+    const heading = el(
       "h3",
-      nombres.get(solicitud.centro_id) ||
+      nombres.get(String(solicitud.centro_id)) ||
       `Establecimiento ${solicitud.centro_id}`
     );
 
-    const form = element("form");
-
-    const estado = selectField(
+    const estado = select(
       "Funcionamiento",
       [
         ["sin_verificar", "Sin verificar"],
@@ -461,7 +714,7 @@
       ]
     );
 
-    const recepcion = selectField(
+    const recepcion = select(
       "Recepción de pacientes",
       [
         ["sin_verificar", "Sin verificar"],
@@ -471,7 +724,7 @@
       ]
     );
 
-    const acceso = selectField(
+    const acceso = select(
       "Accesibilidad",
       [
         ["sin_verificar", "Sin verificar"],
@@ -481,56 +734,62 @@
       ]
     );
 
-    const observationsLabel = element("label");
-    observationsLabel.append(
-      element("span", "Acciones de respuesta y observaciones")
+    const label = el("label", null, "as-label");
+
+    label.append(
+      el("span", "Acciones de respuesta y observaciones")
     );
 
-    const observations = element("textarea");
-    observations.className = "as-field";
-    observations.rows = 4;
-    observations.maxLength = 3000;
-    observationsLabel.append(observations);
+    const observaciones = el("textarea", null, "as-field");
 
-    const submit = element(
+    observaciones.rows = 4;
+    observaciones.maxLength = 3000;
+
+    label.append(observaciones);
+
+    const submit = el(
       "button",
       "Enviar reporte",
-      "as-button"
+      "as-btn"
     );
+
     submit.type = "submit";
 
     form.append(
       heading,
-      estado.wrapper,
-      recepcion.wrapper,
-      acceso.wrapper,
-      observationsLabel,
+      badge(solicitud.es_prueba),
+      estado.wrap,
+      recepcion.wrap,
+      acceso.wrap,
+      label,
       submit
     );
 
     form.addEventListener("submit", async event => {
       event.preventDefault();
 
-      if (!window.confirm(
-        "¿Confirmás que la información corresponde " +
-        "a la situación real del establecimiento?"
-      )) return;
+      const confirmacion = solicitud.es_prueba
+        ? "¿Confirmás el envío de este reporte de PRUEBA?"
+        : "¿Confirmás que los datos reflejan la situación REAL?";
+
+      if (!window.confirm(confirmacion)) return;
 
       submit.disabled = true;
-      notice("Enviando reporte…");
 
       try {
         await rpc("as_responder_solicitud", {
           p_solicitud_id: solicitud.id,
-          p_estado_operativo: estado.select.value,
-          p_recepcion_pacientes: recepcion.select.value,
-          p_accesibilidad: acceso.select.value,
-          p_observaciones: observations.value.trim()
+          p_estado_operativo: estado.node.value,
+          p_recepcion_pacientes: recepcion.node.value,
+          p_accesibilidad: acceso.node.value,
+          p_observaciones: observaciones.value.trim()
         });
 
-        await showDashboard();
+        await dashboard();
+
         notice(
-          "Reporte enviado. Pendiente de validación."
+          "Reporte enviado correctamente. " +
+          "Queda pendiente de validación."
         );
 
       } catch (error) {
@@ -540,78 +799,60 @@
     });
 
     content.append(
-      button(
-        "Volver al panel",
-        showDashboard,
-        "as-secondary"
-      ),
+      btn("Volver al panel", dashboard, "as-secondary"),
       form
     );
   }
 
   async function showValidations(nombres) {
-    const box = element("div", null, "as-box");
+    const box = el("section", null, "as-section");
+
     box.append(
-      element("h3", "Reportes pendientes de validación")
+      el("h3", "Reportes pendientes de validación")
     );
+
     content.append(box);
 
     const reportes = await rest(
       "as_reportes_institucionales",
       "select=id,centro_id,estado_operativo," +
       "recepcion_pacientes,accesibilidad," +
-      "observaciones,creado_en,validacion" +
+      "observaciones,creado_en,validacion,es_prueba" +
       "&validacion=eq.pendiente" +
       "&order=creado_en.desc&limit=100"
     );
 
     if (!reportes.length) {
       box.append(
-        element("p", "No hay reportes para validar.")
+        el("p", "No hay reportes pendientes.")
       );
       return;
     }
 
     for (const reporte of reportes) {
-      const card = element("article", null, "as-card");
+      const card = el("article", null, "as-card");
 
       card.append(
-        element(
-          "h3",
-          nombres.get(reporte.centro_id) ||
+        el(
+          "h4",
+          nombres.get(String(reporte.centro_id)) ||
           `Establecimiento ${reporte.centro_id}`
         ),
-        element(
-          "p",
-          `Funcionamiento: ${reporte.estado_operativo}`
-        ),
-        element(
-          "p",
-          `Recepción: ${reporte.recepcion_pacientes}`
-        ),
-        element(
-          "p",
-          `Accesibilidad: ${reporte.accesibilidad}`
-        ),
-        element(
-          "p",
-          `Observaciones: ${reporte.observaciones || "Ninguna"}`
-        ),
-        element(
-          "small",
-          `Enviado: ${dateText(reporte.creado_en)}`
-        )
+        badge(reporte.es_prueba),
+        el("p", `Funcionamiento: ${reporte.estado_operativo}`),
+        el("p", `Recepción: ${reporte.recepcion_pacientes}`),
+        el("p", `Accesibilidad: ${reporte.accesibilidad}`),
+        el("p", `Observaciones: ${reporte.observaciones || "Ninguna"}`),
+        el("small", `Enviado: ${dateText(reporte.creado_en)}`)
       );
 
-      const actions = element("div", null, "as-actions");
-
       async function decide(decision) {
-        const texto = decision === "aprobado"
+        const accion = decision === "aprobado"
           ? "aprobar"
           : "rechazar";
 
         if (!window.confirm(
-          `¿Confirmás que querés ${texto} este reporte?`
+          `¿Confirmás que querés ${accion} este reporte?`
         )) return;
 
         try {
@@ -620,36 +861,137 @@
             p_decision: decision
           });
 
-          await showDashboard();
+          await dashboard();
+
           notice(
             decision === "aprobado"
-              ? "Reporte aprobado. La publicación pública " +
-                "todavía no está conectada."
+              ? "Reporte aprobado. No se publicó automáticamente."
               : "Reporte rechazado."
           );
 
         } catch (error) {
-          notice(
-            "No se pudo procesar el reporte: " +
-            error.message
-          );
+          notice("No se pudo validar: " + error.message);
         }
       }
 
-      actions.append(
-        button("Aprobar", () => decide("aprobado")),
-        button(
+      card.append(
+        btn("Aprobar", () => decide("aprobado")),
+        btn(
           "Rechazar",
           () => decide("rechazado"),
           "as-danger"
         )
       );
 
-      card.append(actions);
+      box.append(card);
+    }
+  }
+
+  async function showPublications(nombres) {
+    const box = el("section", null, "as-section");
+
+    box.append(
+      el("h3", "Publicación de estados verificados"),
+      el(
+        "p",
+        "Solo se muestran reportes reales aprobados. " +
+        "La publicación modifica el estado público del establecimiento."
+      )
+    );
+
+    content.append(box);
+
+    const reportes = await rest(
+      "as_reportes_institucionales",
+      "select=id,centro_id,estado_operativo," +
+      "recepcion_pacientes,accesibilidad," +
+      "creado_en,es_prueba,validacion,publicado_en" +
+      "&validacion=eq.aprobado" +
+      "&es_prueba=eq.false" +
+      "&publicado_en=is.null" +
+      "&order=creado_en.desc&limit=100"
+    );
+
+    if (!reportes.length) {
+      box.append(
+        el("p", "No hay reportes reales pendientes de publicación.")
+      );
+      return;
+    }
+
+    for (const reporte of reportes) {
+      const card = el("article", null, "as-card");
+
+      card.append(
+        el(
+          "h4",
+          nombres.get(String(reporte.centro_id)) ||
+          `Establecimiento ${reporte.centro_id}`
+        ),
+        badge(false),
+        el("p", `Funcionamiento: ${reporte.estado_operativo}`),
+        el("p", `Recepción: ${reporte.recepcion_pacientes}`),
+        el("p", `Accesibilidad: ${reporte.accesibilidad}`),
+        el("small", `Reporte: ${dateText(reporte.creado_en)}`)
+      );
+
+      const vigencia = select(
+        "Vigencia de la publicación",
+        [
+          ["1", "1 hora"],
+          ["3", "3 horas"],
+          ["6", "6 horas"],
+          ["12", "12 horas"],
+          ["24", "24 horas"]
+        ]
+      );
+
+      vigencia.node.value = "6";
+
+      const publicar = btn(
+        "Publicar estado verificado",
+        async () => {
+          const nombre =
+            nombres.get(String(reporte.centro_id)) ||
+            `Establecimiento ${reporte.centro_id}`;
+
+          if (!window.confirm(
+            "PUBLICACIÓN REAL\n\n" +
+            nombre +
+            "\n\nEsta acción actualizará la información pública " +
+            "durante " + vigencia.node.value + " horas.\n\n" +
+            "¿Confirmás que verificaste el reporte?"
+          )) return;
+
+          publicar.disabled = true;
+
+          try {
+            await rpc("as_publicar_reporte", {
+              p_reporte_id: reporte.id,
+              p_vigencia_horas: Number(vigencia.node.value)
+            });
+
+            await dashboard();
+
+            notice(
+              "Estado publicado. " +
+              "Verificá su visualización y vigencia en el directorio."
+            );
+
+          } catch (error) {
+            notice(
+              "No se pudo publicar: " + error.message
+            );
+
+            publicar.disabled = false;
+          }
+        }
+      );
+
+      card.append(vigencia.wrap, publicar);
       box.append(card);
     }
   }
 
   showLogin();
-
 })();
