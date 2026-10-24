@@ -1,16 +1,17 @@
 
 /*
- * APP ALERTA SALUD V1.10.15
- * Web Push - Prueba controlada de dispositivos
+ * APP ALERTA SALUD V1.10.16
  *
  * Archivo: push.js
  * Acción: REEMPLAZAR COMPLETO
  *
- * Conserva las tres pestañas.
- * Permite registrar, consultar, renovar,
- * guardar preferencias y dar de baja.
+ * Corrección:
+ * - Conserva selecciones pendientes.
+ * - Evita perder preferencias al activar.
+ * - Verifica el guardado en Supabase.
+ * - Mantiene las tres pestañas.
  *
- * No envía notificaciones.
+ * No habilita envíos automáticos.
  */
 
 (() => {
@@ -36,8 +37,9 @@
     initialized: false,
     loading: false,
     busy: false,
-    mode: "vigentes",
-    registered: false
+    registered: false,
+    dirty: false,
+    mode: "vigentes"
   };
 
   const $ = id => document.getElementById(id);
@@ -192,6 +194,12 @@
   }
 
   async function loadCenters() {
+    if (!configured()) {
+      throw new Error(
+        "El servicio Web Push no está configurado."
+      );
+    }
+
     const response = await fetch(
       API + "/centers",
       {
@@ -231,21 +239,16 @@
   async function subscribe() {
     const reg = await registration();
 
-    const existing = await reg.pushManager
-      .getSubscription();
+    const existing =
+      await reg.pushManager.getSubscription();
 
     const credentials = readCredentials();
 
-    /*
-     * Si existe una suscripción local
-     * sin credencial, no intentamos
-     * apropiarnos del endpoint remoto.
-     */
     if (existing && !credentials) {
       throw new Error(
-        "Este navegador conserva una suscripción " +
-        "anterior sin credencial de administración. " +
-        "No se modificó por seguridad."
+        "El navegador conserva una suscripción " +
+        "sin credencial. No se modificó " +
+        "por seguridad."
       );
     }
 
@@ -306,11 +309,6 @@
       return result;
 
     } catch (error) {
-      /*
-       * Nunca damos de baja una
-       * suscripción local preexistente
-       * ante un error de comunicación.
-       */
       if (createdLocally) {
         await subscription.unsubscribe()
           .catch(() => {});
@@ -343,22 +341,20 @@
 
     if (!credentials) {
       throw new Error(
-        "No hay credenciales para dar de baja el dispositivo."
+        "No hay credenciales para desactivar."
       );
     }
 
-    /*
-     * Primero revocamos el acceso remoto.
-     * Después eliminamos la suscripción
-     * local y las credenciales.
-     */
     await request(
       "/unsubscribe",
       credentials
     );
 
     clearCredentials();
+
     state.registered = false;
+    state.dirty = false;
+    state.selected.clear();
 
     const subscription = await refresh();
 
@@ -389,6 +385,10 @@
       return;
     }
 
+    /*
+     * TERCERA PESTAÑA
+     */
+
     const settingsTab = create(
       "button",
       "⚙ Configurar",
@@ -416,6 +416,10 @@
       button.style.whiteSpace = "normal";
       button.style.lineHeight = "1.25";
     }
+
+    /*
+     * PANEL INTEGRADO
+     */
 
     const panel = create("div");
 
@@ -555,6 +559,7 @@
         mode === "configurar";
 
       panel.hidden = !isSettings;
+
       panel.style.display =
         isSettings ? "block" : "none";
 
@@ -585,9 +590,14 @@
       state.busy = value;
 
       activateButton.disabled = value;
+
       saveButton.disabled =
         value || !state.registered;
     }
+
+    /*
+     * RENDERIZADO DE ESTABLECIMIENTOS
+     */
 
     function renderCenters() {
       centersContainer.replaceChildren();
@@ -599,6 +609,7 @@
             "No hay establecimientos disponibles."
           )
         );
+
         return;
       }
 
@@ -640,6 +651,16 @@
             } else {
               state.selected.delete(id);
             }
+
+            /*
+             * Marca cambios pendientes.
+             * No serán reemplazados por
+             * una consulta al servidor.
+             */
+            state.dirty = true;
+
+            status.textContent =
+              "Tenés cambios pendientes de guardar.";
           }
         );
 
@@ -661,11 +682,21 @@
       }
     }
 
-    async function updateStatus() {
+    /*
+     * CONSULTA DEL ESTADO
+     *
+     * preserveSelection evita sobrescribir
+     * los cambios realizados por el usuario.
+     */
+
+    async function updateStatus(
+      preserveSelection = true
+    ) {
       const credentials = readCredentials();
 
       if (!credentials) {
         state.registered = false;
+
         activateButton.textContent =
           "Activar notificaciones";
 
@@ -685,19 +716,36 @@
         if (server?.active && local) {
           state.registered = true;
 
-          state.selected = new Set(
-            (server.centerIds || []).map(Number)
-          );
+          /*
+           * Solo cargar preferencias remotas
+           * si no hay cambios pendientes.
+           */
+          if (
+            !preserveSelection ||
+            !state.dirty
+          ) {
+            state.selected = new Set(
+              (server.centerIds || [])
+                .map(Number)
+            );
 
-          renderCenters();
+            state.dirty = false;
+
+            renderCenters();
+          }
 
           activateButton.textContent =
             "Desactivar notificaciones";
 
           status.textContent =
-            "Dispositivo registrado. " +
-            "Los envíos de prueba todavía " +
-            "no están habilitados.";
+            state.dirty
+              ? "Dispositivo registrado. " +
+                "Tenés cambios pendientes de guardar."
+              : "Dispositivo registrado. " +
+                `${state.selected.size} establecimiento(s) ` +
+                "seleccionado(s). " +
+                "Los envíos siguen deshabilitados.";
+
         } else {
           state.registered = false;
 
@@ -717,6 +765,10 @@
 
       setBusy(false);
     }
+
+    /*
+     * CARGAR PESTAÑA CONFIGURAR
+     */
 
     settingsTab.addEventListener(
       "click",
@@ -738,6 +790,7 @@
 
         try {
           await loadCenters();
+
           renderCenters();
 
           if (!supported()) {
@@ -746,10 +799,11 @@
 
             buttons.hidden = true;
           } else {
-            await updateStatus();
+            await updateStatus(false);
           }
 
           state.initialized = true;
+
         } catch (error) {
           status.textContent =
             error.message;
@@ -759,6 +813,10 @@
         }
       }
     );
+
+    /*
+     * PESTAÑAS EXISTENTES
+     */
 
     current.addEventListener(
       "click",
@@ -800,6 +858,10 @@
       attributeFilter: ["class"]
     });
 
+    /*
+     * ACTIVAR / DESACTIVAR
+     */
+
     activateButton.addEventListener(
       "click",
       async () => {
@@ -829,19 +891,62 @@
         try {
           if (action === "activar") {
             await subscribe();
+
+            /*
+             * No consultamos el servidor
+             * antes de guardar la selección
+             * que hizo el usuario.
+             */
+            if (
+              state.dirty &&
+              state.selected.size > 0
+            ) {
+              await savePreferences(
+                [...state.selected]
+              );
+
+              state.dirty = false;
+            }
+
+            await updateStatus(true);
+
           } else {
             await unsubscribe();
+
+            renderCenters();
+
+            activateButton.textContent =
+              "Activar notificaciones";
+
+            status.textContent =
+              "Notificaciones desactivadas.";
           }
 
-          await updateStatus();
         } catch (error) {
           status.textContent =
             error.message;
+
+          /*
+           * Si el registro se completó
+           * pero falló el guardado,
+           * no ocultamos la suscripción.
+           */
+          if (readCredentials()) {
+            state.registered = true;
+
+            activateButton.textContent =
+              "Desactivar notificaciones";
+          }
+
         } finally {
           setBusy(false);
         }
       }
     );
+
+    /*
+     * GUARDAR Y VERIFICAR PREFERENCIAS
+     */
 
     saveButton.addEventListener(
       "click",
@@ -855,16 +960,62 @@
 
         setBusy(true);
 
+        const requestedIds = [
+          ...state.selected
+        ].sort((a, b) => a - b);
+
         try {
           await savePreferences(
-            [...state.selected]
+            requestedIds
           );
 
+          /*
+           * Confirmar leyendo nuevamente
+           * las preferencias almacenadas.
+           */
+          const server =
+            await getServerSubscription();
+
+          const savedIds = (
+            server?.centerIds || []
+          )
+            .map(Number)
+            .sort((a, b) => a - b);
+
+          const confirmed =
+            requestedIds.length ===
+              savedIds.length &&
+            requestedIds.every(
+              (id, index) =>
+                id === savedIds[index]
+            );
+
+          if (!confirmed) {
+            throw new Error(
+              "El servidor no confirmó todos " +
+              "los establecimientos seleccionados."
+            );
+          }
+
+          state.selected = new Set(
+            savedIds
+          );
+
+          state.dirty = false;
+
+          renderCenters();
+
           status.textContent =
-            "Preferencias guardadas correctamente.";
+            `Preferencias guardadas: ` +
+            `${savedIds.length} establecimiento(s).`;
+
         } catch (error) {
+          state.dirty = true;
+
           status.textContent =
+            "No se pudo confirmar el guardado: " +
             error.message;
+
         } finally {
           setBusy(false);
         }
