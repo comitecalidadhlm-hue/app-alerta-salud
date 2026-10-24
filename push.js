@@ -1,16 +1,17 @@
 
 /*
- * APP ALERTA SALUD V1.10.8
- * Web Push - Interfaz compacta
+ * APP ALERTA SALUD V1.10.9
+ * Web Push - Integración compacta
  *
  * Archivo: push.js
  * Acción: REEMPLAZAR COMPLETO
  *
- * Integra la configuración de avisos en un
- * desplegable dentro del Centro de Notificaciones.
+ * La configuración se integra en
+ * .as-notification-actions.
  *
- * Mantiene TEST_MODE para impedir registros
- * reales antes de completar la seguridad.
+ * No modifica publicaciones institucionales.
+ * Registro real desactivado hasta completar
+ * las pruebas de seguridad.
  */
 
 (() => {
@@ -171,7 +172,9 @@
 
     try {
       result = await response.json();
-    } catch {}
+    } catch {
+      // Se conserva el error HTTP.
+    }
 
     if (!response.ok) {
       const error = new Error(
@@ -359,8 +362,13 @@
       ".as-notifications"
     );
 
+    const actions = parent?.querySelector(
+      ".as-notification-actions"
+    );
+
     if (
       !parent ||
+      !actions ||
       document.getElementById(
         "asPushPreferences"
       )
@@ -369,49 +377,49 @@
     }
 
     /*
-     * Se usa details/summary nativo:
-     * compacto, accesible y cerrado
-     * por defecto.
+     * Se integra dentro de la barra
+     * de acciones ya existente.
      */
 
     const details = element("details");
     details.id = "asPushPreferences";
 
     details.style.cssText = [
-      "margin:10px 0",
-      "border-top:1px solid #d5e0e9",
-      "padding-top:10px"
+      "width:100%",
+      "margin:0",
+      "padding:0"
     ].join(";");
 
     const summary = element(
       "summary",
-      "🔔 Configurar avisos en mi dispositivo"
+      "🔔 Configurar avisos"
     );
 
     summary.style.cssText = [
       "cursor:pointer",
       "font-weight:600",
-      "font-size:13px",
-      "padding:6px 0",
-      "list-style-position:inside"
+      "font-size:12px",
+      "padding:8px 10px",
+      "border:1px solid #c5d4e2",
+      "border-radius:8px",
+      "background:#eef3f8",
+      "color:#16344d"
     ].join(";");
 
     const content = element("div");
 
     content.style.cssText = [
-      "padding:10px 0 4px"
+      "padding:10px 0 2px",
+      "font-size:12px"
     ].join(";");
 
     const description = element(
       "p",
-      "Seleccioná los establecimientos de los " +
-      "que querés recibir avisos oficiales."
+      "Elegí los establecimientos de los " +
+      "que deseás recibir avisos oficiales."
     );
 
-    description.style.cssText = [
-      "font-size:12px",
-      "margin:0 0 10px"
-    ].join(";");
+    description.style.margin = "0 0 8px";
 
     const status = element("p");
 
@@ -421,7 +429,7 @@
     status.style.cssText = [
       "font-size:12px",
       "margin:8px 0",
-      "color:var(--muted,#64748b)"
+      "color:#526477"
     ].join(";");
 
     const centersContainer =
@@ -434,17 +442,19 @@
     ].join(";");
 
     const activateButton =
-      element("button");
+      element(
+        "button",
+        "Activar notificaciones"
+      );
 
     activateButton.type = "button";
     activateButton.className = "secondary";
-    activateButton.textContent =
-      "Activar notificaciones";
 
-    const saveButton = element(
-      "button",
-      "Guardar selección"
-    );
+    const saveButton =
+      element(
+        "button",
+        "Guardar selección"
+      );
 
     saveButton.type = "button";
     saveButton.className = "secondary";
@@ -476,10 +486,23 @@
     );
 
     /*
-     * Se integra en el espacio existente,
-     * sin generar una tarjeta adicional.
+     * Reutiliza la barra existente.
+     * No crea una tarjeta independiente.
      */
-    parent.append(details);
+
+    actions.append(details);
+
+    /*
+     * Ajuste compacto de la barra.
+     * Mantiene el botón de actualización.
+     */
+
+    actions.style.display = "flex";
+    actions.style.flexWrap = "wrap";
+    actions.style.alignItems = "flex-start";
+    actions.style.gap = "8px";
+
+    details.style.flex = "1 1 150px";
 
     if (!supported()) {
       status.textContent =
@@ -655,15 +678,20 @@
     );
 
     let initialized = false;
+    let initializing = false;
 
     details.addEventListener(
       "toggle",
       async () => {
-        if (!details.open || initialized) {
+        if (
+          !details.open ||
+          initialized ||
+          initializing
+        ) {
           return;
         }
 
-        initialized = true;
+        initializing = true;
         setBusy(true);
 
         try {
@@ -679,11 +707,13 @@
             await update();
           }
 
+          initialized = true;
+
         } catch (error) {
           status.textContent =
             error.message;
-          initialized = false;
         } finally {
+          initializing = false;
           setBusy(false);
         }
       }
