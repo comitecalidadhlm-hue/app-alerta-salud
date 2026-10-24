@@ -1,33 +1,56 @@
 
 /*
- * APP ALERTA SALUD V1.10.0
+ * APP ALERTA SALUD V1.10.7
  * Configuración y carga de módulos
+ *
+ * Archivo: supabase-config.js
+ * Acción: REEMPLAZAR COMPLETO
+ *
+ * Cloudflare Workers + Supabase
+ *
+ * IMPORTANTE:
+ * - La clave de Supabase es pública.
+ * - La clave VAPID incluida es pública.
+ * - Nunca incluir claves privadas o service_role.
  */
+
+"use strict";
+
+/* =========================================
+   SUPABASE
+   ========================================= */
 
 window.ALERTA_SUPABASE = Object.freeze({
   url: "https://mruteipysgyfrnxwhjwn.supabase.co",
+
   publishableKey:
     "sb_publishable_wnu8PccuNZ0aQuEDAEad3Q_6IxzErlh"
 });
 
-/*
- * Configuración Web Push.
- *
- * Completar en la siguiente etapa:
- * - publicKey: clave VAPID pública
- * - subscriptionEndpoint: URL HTTPS del backend
- *
- * Nunca colocar claves privadas aquí.
- */
+/* =========================================
+   WEB PUSH
+   ========================================= */
 
 window.ALERTA_PUSH = Object.freeze({
-  publicKey: "",
-  subscriptionEndpoint: ""
+
+  // Clave pública VAPID.
+  publicKey:
+    "BANf4kJOT8E0yog5v80AjV0mWRqxQBf3EkAkcSbhf-B8oX59NcGn0UUTgDf55Ujm6DClv8ws7oTrZHSk85G0g1M",
+
+  // Backend seguro en Cloudflare.
+  subscriptionEndpoint:
+    "https://alerta-salud-push.comitecalidadhlm.workers.dev"
+
 });
+
+/* =========================================
+   CARGA SECUENCIAL DE MÓDULOS
+   ========================================= */
 
 document.addEventListener(
   "DOMContentLoaded",
   () => {
+
     const modules = [
       "./institucional.js",
       "./notificaciones.js",
@@ -36,12 +59,16 @@ document.addEventListener(
     ];
 
     function loadNext(index) {
-      if (index >= modules.length) return;
+
+      if (index >= modules.length) {
+        return;
+      }
 
       const script =
         document.createElement("script");
 
       script.src = modules[index];
+
       script.async = false;
 
       script.onload = () => {
