@@ -1,15 +1,18 @@
 
 /*
- * APP ALERTA SALUD V1.9.3
- * Gestión de autoridades y declaraciones oficiales.
+ * APP ALERTA SALUD V1.9.7
+ * PANEL INSTITUCIONAL
  *
- * Requiere:
- * - supabase-config.js
- * - SQL 14A, 14B, 14C, 14D
- * - SQL 14E.3A: as_listar_usuarios_institucionales
+ * Funciones:
+ * - Inicio y cierre de sesión
+ * - Declaraciones oficiales
+ * - Publicación de novedades institucionales
+ * - Vista previa y confirmación
+ * - Administración de autoridades
+ * - Consulta y revocación de habilitaciones
  *
- * No modifica estados al iniciar.
- * Publica únicamente tras confirmación expresa.
+ * La autorización definitiva se verifica
+ * mediante funciones seguras de Supabase.
  */
 
 (() => {
@@ -18,9 +21,17 @@
   const cfg = window.ALERTA_SUPABASE;
   const host = document.getElementById("view-mas");
 
-  if (!cfg?.url || !cfg?.publishableKey || !host) return;
+  if (!cfg?.url || !cfg?.publishableKey || !host) {
+    console.error("Configuración institucional no disponible");
+    return;
+  }
+
+  if (document.getElementById("asInstitutionalPanel")) {
+    return;
+  }
 
   const API = cfg.url.replace(/\/$/, "");
+
   let token = null;
   let user = null;
   let profile = null;
@@ -28,7 +39,10 @@
   let authorities = [];
   let users = [];
 
+  const $ = id => document.getElementById(id);
+
   const style = document.createElement("style");
+
   style.textContent = `
     .as-panel {
       margin: 20px 0;
@@ -37,14 +51,23 @@
       border-radius: 13px;
       background: #fff;
       color: #173047;
+      box-sizing: border-box;
     }
-    .as-panel h2 { margin: 0 0 12px; }
-    .as-panel h3 { margin: 14px 0 8px; }
+
+    .as-panel h2 {
+      margin: 0 0 12px;
+    }
+
+    .as-panel h3 {
+      margin: 14px 0 8px;
+    }
+
     .as-panel label {
       display: block;
       margin: 12px 0;
       font-weight: 600;
     }
+
     .as-panel input,
     .as-panel select,
     .as-panel textarea {
@@ -60,6 +83,7 @@
       font: inherit;
       font-weight: 400;
     }
+
     .as-panel button {
       padding: 10px 13px;
       margin: 4px 5px 4px 0;
@@ -70,12 +94,20 @@
       font: inherit;
       cursor: pointer;
     }
+
     .as-panel button:disabled {
       opacity: .55;
       cursor: wait;
     }
-    .as-panel .as-secondary { background: #475569; }
-    .as-panel .as-danger { background: #a72b35; }
+
+    .as-panel .as-secondary {
+      background: #475569;
+    }
+
+    .as-panel .as-danger {
+      background: #a72b35;
+    }
+
     .as-panel .as-message {
       padding: 11px;
       margin: 10px 0;
@@ -84,55 +116,96 @@
       white-space: pre-wrap;
       overflow-wrap: anywhere;
     }
+
     .as-panel .as-card {
       margin: 12px 0;
       padding: 13px;
       border: 1px solid #d5e0e9;
       border-radius: 10px;
     }
-    .as-panel .as-card p { margin: 6px 0; }
+
+    .as-panel .as-card p {
+      margin: 6px 0;
+    }
+
     .as-panel .as-muted {
       font-size: .9rem;
       color: #526577;
     }
+
     .as-panel .as-tabs {
       display: flex;
       flex-wrap: wrap;
       gap: 5px;
       margin: 12px 0;
     }
+
     .as-panel .as-tabs button {
       flex: 1;
       min-width: 110px;
     }
-    .as-panel .as-active-tab {
-      background: #0c354f;
+
+    .as-panel .as-preview {
+      border: 2px solid #9bb9cf;
+      background: #f5f9fc;
+      padding: 15px;
+      border-radius: 10px;
+      margin: 14px 0;
+    }
+
+    .as-panel .as-preview p {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      line-height: 1.55;
+    }
+
+    .as-panel .as-warning {
+      border-left: 4px solid #bb7921;
+      background: #fff7e8;
+      padding: 12px;
+      margin: 12px 0;
+      line-height: 1.5;
+    }
+
+    .as-panel .as-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 12px 0;
     }
   `;
+
   document.head.append(style);
 
-  function node(tag, text, className) {
-    const item = document.createElement(tag);
-    if (text !== undefined && text !== null) {
-      item.textContent = String(text);
+  function node(tag, text = null, className = "") {
+    const element = document.createElement(tag);
+
+    if (text !== null) {
+      element.textContent = String(text);
     }
-    if (className) item.className = className;
-    return item;
+
+    if (className) {
+      element.className = className;
+    }
+
+    return element;
   }
 
   function button(text, action, className = "") {
-    const item = node("button", text, className);
-    item.type = "button";
-    item.addEventListener("click", action);
-    return item;
+    const element = node("button", text, className);
+    element.type = "button";
+    element.addEventListener("click", action);
+    return element;
   }
 
   function inputField(label, type = "text", required = true) {
     const wrapper = node("label", label);
     const input = node("input");
+
     input.type = type;
     input.required = required;
     wrapper.append(input);
+
     return { wrapper, input };
   }
 
@@ -140,31 +213,56 @@
     const wrapper = node("label", label);
     const input = node("select");
 
-    for (const [value, title] of options) {
-      const option = node("option", title);
-      option.value = String(value);
-      input.append(option);
+    for (const [value, text] of options) {
+      input.add(new Option(text, String(value)));
     }
 
     wrapper.append(input);
     return { wrapper, input };
   }
 
-  function textArea(label) {
+  function textArea(label, maxLength = 2000) {
     const wrapper = node("label", label);
     const input = node("textarea");
-    input.rows = 3;
-    input.maxLength = 3000;
+
+    input.rows = 4;
+    input.maxLength = maxLength;
     wrapper.append(input);
+
     return { wrapper, input };
   }
 
   function dateText(value) {
     if (!value) return "Sin fecha de finalización";
-    const d = new Date(value);
-    return Number.isNaN(d.getTime())
+
+    const date = new Date(value);
+
+    return Number.isNaN(date.getTime())
       ? "Fecha inválida"
-      : d.toLocaleString("es-AR");
+      : date.toLocaleString("es-AR");
+  }
+
+  function centerName(id) {
+    return centers.find(
+      center => String(center.id) === String(id)
+    )?.nombre || `Establecimiento ${id}`;
+  }
+
+  function activeAuthority(authority) {
+    const now = Date.now();
+
+    return authority.activo === true &&
+      !authority.revocado_en &&
+      Date.parse(authority.habilitado_desde) <= now &&
+      (
+        !authority.habilitado_hasta ||
+        Date.parse(authority.habilitado_hasta) > now
+      );
+  }
+
+  function isSuperadmin() {
+    return profile?.activo === true &&
+      profile?.rol === "superadmin";
   }
 
   async function request(path, options = {}) {
@@ -174,7 +272,9 @@
       ...options.headers
     };
 
-    if (token) headers.Authorization = `Bearer ${token}`;
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
 
     const response = await fetch(API + path, {
       ...options,
@@ -203,17 +303,22 @@
   function rpc(name, args = {}) {
     return request(`/rest/v1/rpc/${name}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json"
+      },
       body: JSON.stringify(args)
     });
   }
 
   const panel = node("section", null, "as-panel");
+  panel.id = "asInstitutionalPanel";
+
   const title = node("h2", "Acceso institucional");
   const message = node("div", "", "as-message");
   const content = node("div");
 
   message.setAttribute("role", "status");
+
   panel.append(title, message, content);
   host.append(panel);
 
@@ -224,28 +329,6 @@
   function screen(heading) {
     title.textContent = heading;
     content.replaceChildren();
-  }
-
-  function centerName(id) {
-    return centers.find(c => String(c.id) === String(id))
-      ?.nombre || `Establecimiento ${id}`;
-  }
-
-  function activeAuthority(a) {
-    const now = Date.now();
-
-    return a.activo === true &&
-      !a.revocado_en &&
-      Date.parse(a.habilitado_desde) <= now &&
-      (
-        !a.habilitado_hasta ||
-        Date.parse(a.habilitado_hasta) > now
-      );
-  }
-
-  function isSuperadmin() {
-    return profile?.activo === true &&
-      profile?.rol === "superadmin";
   }
 
   function logout() {
@@ -260,25 +343,40 @@
 
   function login() {
     screen("Acceso institucional");
+
     notice(
       "Ingreso exclusivo para Dirección, Comité de Crisis " +
       "y administradores autorizados."
     );
 
     const form = node("form");
-    const email = inputField("Correo electrónico", "email");
-    const password = inputField("Contraseña", "password");
+
+    const email = inputField(
+      "Correo electrónico",
+      "email"
+    );
+
+    const password = inputField(
+      "Contraseña",
+      "password"
+    );
+
     const submit = node("button", "Ingresar");
+    submit.type = "submit";
 
     email.input.autocomplete = "username";
     password.input.autocomplete = "current-password";
-    submit.type = "submit";
 
-    form.append(email.wrapper, password.wrapper, submit);
+    form.append(
+      email.wrapper,
+      password.wrapper,
+      submit
+    );
 
     form.addEventListener("submit", async event => {
       event.preventDefault();
       submit.disabled = true;
+
       notice("Verificando credenciales…");
 
       try {
@@ -306,7 +404,11 @@
         token = null;
         user = null;
         profile = null;
-        notice("No se pudo ingresar: " + error.message);
+
+        notice(
+          "No se pudo ingresar: " + error.message
+        );
+
       } finally {
         submit.disabled = false;
       }
@@ -316,10 +418,15 @@
   }
 
   async function loadIdentity() {
+    if (!user?.id) {
+      throw new Error("Sesión institucional no disponible");
+    }
+
     const profiles = await rest(
       "as_perfiles",
       "select=usuario_id,nombre,rol,activo" +
-      "&usuario_id=eq." + encodeURIComponent(user.id) +
+      "&usuario_id=eq." +
+      encodeURIComponent(user.id) +
       "&limit=1"
     );
 
@@ -336,15 +443,16 @@
       "select=id,centro_id,usuario_id,tipo_autoridad," +
       "cargo,documento_designacion,habilitado_desde," +
       "habilitado_hasta,activo,revocado_en" +
-      "&usuario_id=eq." + encodeURIComponent(user.id)
+      "&usuario_id=eq." +
+      encodeURIComponent(user.id)
     );
 
-    const hasInstitutionalRole =
+    const institutionalRole =
       profile?.activo === true &&
       ["superadmin", "admin"].includes(profile.rol);
 
     if (
-      !hasInstitutionalRole &&
+      !institutionalRole &&
       !authorities.some(activeAuthority)
     ) {
       throw new Error(
@@ -358,11 +466,13 @@
 
     notice(
       `${profile?.nombre || user?.email || "Usuario"}\n` +
-      "La publicación de estados está reservada " +
-      "a autoridades previamente habilitadas."
+      "Las publicaciones oficiales requieren una " +
+      "habilitación institucional vigente."
     );
 
-    content.append(
+    const actions = node("div", null, "as-actions");
+
+    actions.append(
       button("Actualizar", async () => {
         try {
           await loadIdentity();
@@ -371,15 +481,22 @@
           notice(error.message);
         }
       }),
-      button("Cerrar sesión", logout, "as-secondary")
+      button(
+        "Cerrar sesión",
+        logout,
+        "as-secondary"
+      )
     );
+
+    content.append(actions);
 
     const own = authorities.filter(activeAuthority);
 
     if (own.length) {
       const section = node("section", null, "as-card");
+
       section.append(
-        node("h3", "Declaraciones institucionales")
+        node("h3", "Publicaciones institucionales")
       );
 
       for (const authority of own) {
@@ -397,6 +514,10 @@
           button(
             "Declarar estado operativo",
             () => declarationForm(authority)
+          ),
+          button(
+            "🔔 Publicar novedad",
+            () => notificationForm(authority)
           )
         );
 
@@ -430,12 +551,16 @@
         node(
           "p",
           "No tenés establecimientos habilitados " +
-          "para publicar estados.",
+          "para realizar publicaciones oficiales.",
           "as-muted"
         )
       );
     }
   }
+
+  // =========================================
+  // DECLARACIONES DE ESTADO OPERATIVO
+  // =========================================
 
   function declarationForm(authority) {
     screen("Declaración oficial");
@@ -443,12 +568,15 @@
     notice(
       "Establecimiento: " +
       centerName(authority.centro_id) +
-      "\nATENCIÓN: la confirmación publica " +
-      "información real inmediatamente."
+      "\nLa confirmación publica información real."
     );
 
     content.append(
-      button("Volver", dashboard, "as-secondary")
+      button(
+        "Volver al panel",
+        dashboard,
+        "as-secondary"
+      )
     );
 
     const form = node("form");
@@ -460,12 +588,15 @@
       ["suspendido", "Atención suspendida"]
     ]);
 
-    const reception = selectField("Recepción de pacientes", [
-      ["sin_verificar", "Sin verificar"],
-      ["recibe", "Recibe pacientes"],
-      ["limitada", "Recepción limitada"],
-      ["no_recibe", "No recibe pacientes"]
-    ]);
+    const reception = selectField(
+      "Recepción de pacientes",
+      [
+        ["sin_verificar", "Sin verificar"],
+        ["recibe", "Recibe pacientes"],
+        ["limitada", "Recepción limitada"],
+        ["no_recibe", "No recibe pacientes"]
+      ]
+    );
 
     const access = selectField("Accesibilidad", [
       ["sin_verificar", "Sin verificar"],
@@ -474,31 +605,39 @@
       ["interrumpido", "Acceso interrumpido"]
     ]);
 
-    const energy = selectField("Suministro eléctrico", [
-      ["sin_verificar", "Sin verificar"],
-      ["normal", "Normal"],
-      ["afectado", "Afectado"],
-      ["sin_servicio", "Sin servicio"]
-    ]);
+    const energy = selectField(
+      "Suministro eléctrico",
+      [
+        ["sin_verificar", "Sin verificar"],
+        ["normal", "Normal"],
+        ["afectado", "Afectado"],
+        ["sin_servicio", "Sin servicio"]
+      ]
+    );
 
-    const validity = selectField("Vigencia del aviso", [
-      ["1", "1 hora"],
-      ["3", "3 horas"],
-      ["6", "6 horas"],
-      ["12", "12 horas"],
-      ["24", "24 horas"]
-    ]);
+    const validity = selectField(
+      "Vigencia del aviso",
+      [
+        ["1", "1 hora"],
+        ["3", "3 horas"],
+        ["6", "6 horas"],
+        ["12", "12 horas"],
+        ["24", "24 horas"]
+      ]
+    );
 
     validity.input.value = "6";
 
     const observations = textArea(
-      "Observaciones y acciones de respuesta"
+      "Observaciones y acciones de respuesta",
+      3000
     );
 
     const submit = node(
       "button",
       "Revisar y publicar declaración"
     );
+
     submit.type = "submit";
 
     form.append(
@@ -525,14 +664,14 @@
         p_vigencia_horas: Number(validity.input.value)
       };
 
-      const allUnknown = [
-        values.p_operatividad,
-        values.p_recepcion_pacientes,
-        values.p_accesibilidad,
-        values.p_energia
-      ].every(value => value === "sin_verificar");
-
-      if (allUnknown) {
+      if (
+        [
+          values.p_operatividad,
+          values.p_recepcion_pacientes,
+          values.p_accesibilidad,
+          values.p_energia
+        ].every(value => value === "sin_verificar")
+      ) {
         notice(
           "Debés informar al menos una condición verificada."
         );
@@ -579,7 +718,9 @@
         );
 
       } catch (error) {
-        notice("No se pudo publicar: " + error.message);
+        notice(
+          "No se pudo publicar: " + error.message
+        );
         submit.disabled = false;
       }
     });
@@ -587,38 +728,466 @@
     content.append(form);
   }
 
-  async function authoritiesAdmin() {
-    screen("Gestión de autoridades");
+  // =========================================
+  // NOVEDADES INSTITUCIONALES V1.9.7
+  // =========================================
+
+  function notificationForm(authority) {
+    screen("Nueva comunicación institucional");
+
+    const center = centerName(authority.centro_id);
+
     notice(
-      "Las habilitaciones requieren designación previa. " +
-      "Registrar una autoridad no publica estados."
+      "Establecimiento: " + center +
+      "\nEsta función comunica cambios específicos " +
+      "en los servicios. No modifica automáticamente " +
+      "el estado operativo general del establecimiento."
     );
 
     content.append(
-      button("Volver al panel", dashboard, "as-secondary")
+      button(
+        "Volver al panel",
+        dashboard,
+        "as-secondary"
+      )
+    );
+
+    const warning = node(
+      "div",
+      "IMPORTANTE: esta función publica información " +
+      "real para la población. No la utilices para " +
+      "realizar pruebas.",
+      "as-warning"
+    );
+
+    content.append(warning);
+
+    const form = node("form");
+
+    const type = selectField(
+      "Tipo de cambio",
+      [
+        ["cambio_horario", "Cambio de horarios"],
+        ["restriccion", "Restricción de atención"],
+        ["suspension", "Suspensión de atención"],
+        ["cierre", "Cierre de atención"],
+        ["restablecimiento", "Restablecimiento"],
+        ["otro", "Otra modificación"]
+      ]
+    );
+
+    const service = inputField(
+      "Servicio afectado"
+    );
+
+    service.input.maxLength = 150;
+    service.input.minLength = 2;
+    service.input.placeholder =
+      "Ej.: Consultorios externos";
+
+    const headline = inputField(
+      "Título de la comunicación"
+    );
+
+    headline.input.minLength = 5;
+    headline.input.maxLength = 150;
+    headline.input.placeholder =
+      "Describí el cambio de forma breve";
+
+    const description = textArea(
+      "Descripción del cambio",
+      2000
+    );
+
+    description.input.minLength = 10;
+    description.input.required = true;
+    description.input.placeholder =
+      "Explicá qué cambia, a quiénes afecta " +
+      "y desde cuándo.";
+
+    const instructions = textArea(
+      "Indicaciones para la población (opcional)",
+      2000
+    );
+
+    instructions.input.placeholder =
+      "Ej.: Los pacientes con turnos asignados " +
+      "deben comunicarse por los canales oficiales.";
+
+    const start = inputField(
+      "Inicio de vigencia (opcional)",
+      "datetime-local",
+      false
+    );
+
+    const end = inputField(
+      "Finalización de vigencia (opcional)",
+      "datetime-local",
+      false
+    );
+
+    const previous = selectField(
+      "Comunicación anterior relacionada",
+      [
+        ["", "Ninguna / comunicación nueva"]
+      ]
+    );
+
+    const previousStatus = node(
+      "p",
+      "Consultando comunicaciones anteriores…",
+      "as-muted"
+    );
+
+    const previewButton = button(
+      "Revisar comunicación",
+      () => {
+        if (!form.reportValidity()) return;
+
+        const values = collectValues();
+
+        if (!validateValues(values)) return;
+
+        showPreview(values);
+      }
+    );
+
+    form.append(
+      type.wrapper,
+      service.wrapper,
+      headline.wrapper,
+      description.wrapper,
+      instructions.wrapper,
+      start.wrapper,
+      end.wrapper,
+      previous.wrapper,
+      previousStatus,
+      previewButton
+    );
+
+    content.append(form);
+
+    // Cargar comunicaciones previas oficiales
+    // del mismo establecimiento.
+    async function loadPrevious() {
+      try {
+        const rows = await rest(
+          "as_notificaciones",
+          "select=id,titulo,publicado_en" +
+          "&centro_id=eq." +
+          encodeURIComponent(authority.centro_id) +
+          "&publicado=eq.true" +
+          "&es_prueba=eq.false" +
+          "&order=publicado_en.desc" +
+          "&limit=100"
+        );
+
+        for (const item of rows || []) {
+          previous.input.add(
+            new Option(
+              `${item.titulo} — ${dateText(item.publicado_en)}`,
+              item.id
+            )
+          );
+        }
+
+        previousStatus.textContent =
+          rows?.length
+            ? "Podés vincular esta novedad con una " +
+              "comunicación oficial anterior."
+            : "No hay comunicaciones anteriores disponibles.";
+
+      } catch (error) {
+        previousStatus.textContent =
+          "No fue posible consultar comunicaciones " +
+          "anteriores. Podés continuar con una " +
+          "comunicación nueva.";
+        console.warn(error);
+      }
+    }
+
+    function collectValues() {
+      return {
+        p_centro_id: Number(authority.centro_id),
+        p_tipo_cambio: type.input.value,
+        p_servicio_afectado:
+          service.input.value.trim(),
+        p_titulo:
+          headline.input.value.trim(),
+        p_descripcion:
+          description.input.value.trim(),
+        p_indicaciones:
+          instructions.input.value.trim() || null,
+        p_vigente_desde:
+          start.input.value
+            ? new Date(start.input.value).toISOString()
+            : null,
+        p_vigente_hasta:
+          end.input.value
+            ? new Date(end.input.value).toISOString()
+            : null,
+        p_notificacion_anterior_id:
+          previous.input.value || null
+      };
+    }
+
+    function validateValues(values) {
+      if (
+        values.p_servicio_afectado.length < 2 ||
+        values.p_servicio_afectado.length > 150
+      ) {
+        notice(
+          "Identificá el servicio afectado " +
+          "con entre 2 y 150 caracteres."
+        );
+        return false;
+      }
+
+      if (
+        values.p_titulo.length < 5 ||
+        values.p_titulo.length > 150
+      ) {
+        notice(
+          "El título debe tener entre 5 y 150 caracteres."
+        );
+        return false;
+      }
+
+      if (
+        values.p_descripcion.length < 10 ||
+        values.p_descripcion.length > 2000
+      ) {
+        notice(
+          "La descripción debe tener entre " +
+          "10 y 2000 caracteres."
+        );
+        return false;
+      }
+
+      const from = values.p_vigente_desde
+        ? Date.parse(values.p_vigente_desde)
+        : Date.now();
+
+      if (
+        values.p_vigente_hasta &&
+        Date.parse(values.p_vigente_hasta) <= from
+      ) {
+        notice(
+          "La fecha de finalización debe ser " +
+          "posterior al inicio de vigencia."
+        );
+        return false;
+      }
+
+      return true;
+    }
+
+    function showPreview(values) {
+      const oldPreview = $("asPublicationPreview");
+      oldPreview?.remove();
+
+      const box = node(
+        "section",
+        null,
+        "as-preview"
+      );
+
+      box.id = "asPublicationPreview";
+
+      box.append(
+        node("h3", "Vista previa de la comunicación"),
+        node("p", "Establecimiento: " + center),
+        node(
+          "p",
+          "Tipo: " +
+          type.input.selectedOptions[0].text
+        ),
+        node(
+          "p",
+          "Servicio: " + values.p_servicio_afectado
+        ),
+        node("h3", values.p_titulo),
+        node("p", values.p_descripcion)
+      );
+
+      if (values.p_indicaciones) {
+        box.append(
+          node("h3", "Indicaciones"),
+          node("p", values.p_indicaciones)
+        );
+      }
+
+      box.append(
+        node(
+          "p",
+          "Inicio: " +
+          (
+            values.p_vigente_desde
+              ? dateText(values.p_vigente_desde)
+              : "Al momento de publicar"
+          )
+        ),
+        node(
+          "p",
+          "Finalización: " +
+          dateText(values.p_vigente_hasta)
+        )
+      );
+
+      if (values.p_notificacion_anterior_id) {
+        box.append(
+          node(
+            "p",
+            "Esta comunicación quedará vinculada " +
+            "a una publicación anterior."
+          )
+        );
+      }
+
+      box.append(
+        node(
+          "div",
+          "Al confirmar, esta información se " +
+          "publicará inmediatamente y quedará " +
+          "registrada bajo tu identidad.",
+          "as-warning"
+        )
+      );
+
+      const confirmButton = button(
+        "Confirmar publicación oficial",
+        async () => {
+          // Si se modificó el formulario después
+          // de la vista previa, no publicar datos
+          // distintos de los revisados.
+          const current = collectValues();
+
+          if (
+            JSON.stringify(current) !==
+            JSON.stringify(values)
+          ) {
+            notice(
+              "El formulario cambió después de la " +
+              "vista previa. Revisá nuevamente."
+            );
+            box.remove();
+            return;
+          }
+
+          if (
+            !window.confirm(
+              "¿CONFIRMÁS LA PUBLICACIÓN OFICIAL?\n\n" +
+              center + "\n" +
+              values.p_titulo + "\n\n" +
+              "La comunicación será visible para " +
+              "la población y quedará registrada " +
+              "bajo tu identidad."
+            )
+          ) {
+            return;
+          }
+
+          confirmButton.disabled = true;
+          previewButton.disabled = true;
+
+          notice("Publicando comunicación oficial…");
+
+          try {
+            const id = await rpc(
+              "as_publicar_notificacion_institucional",
+              values
+            );
+
+            dashboard();
+
+            notice(
+              "Comunicación publicada correctamente.\n" +
+              "Identificador: " + id +
+              "\nLa publicación ya puede consultarse " +
+              "desde el Centro de Notificaciones."
+            );
+
+          } catch (error) {
+            notice(
+              "No se pudo publicar: " + error.message
+            );
+
+            confirmButton.disabled = false;
+            previewButton.disabled = false;
+          }
+        }
+      );
+
+      box.append(
+        confirmButton,
+        button(
+          "Volver a editar",
+          () => box.remove(),
+          "as-secondary"
+        )
+      );
+
+      form.after(box);
+
+      box.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    }
+
+    loadPrevious();
+  }
+
+  // =========================================
+  // ADMINISTRACIÓN DE AUTORIDADES
+  // =========================================
+
+  async function authoritiesAdmin() {
+    if (!isSuperadmin()) {
+      notice("No tenés permiso para gestionar autoridades.");
+      return;
+    }
+
+    screen("Gestión de autoridades");
+
+    notice(
+      "Las habilitaciones requieren designación previa. " +
+      "Registrar una autoridad no publica información."
+    );
+
+    content.append(
+      button(
+        "Volver al panel",
+        dashboard,
+        "as-secondary"
+      )
     );
 
     const tabs = node("div", null, "as-tabs");
     const body = node("div");
 
-    const newTab = button(
-      "Nueva habilitación",
-      () => showAuthorityForm(body)
+    tabs.append(
+      button(
+        "Nueva habilitación",
+        () => showAuthorityForm(body)
+      ),
+      button(
+        "Autoridades registradas",
+        () => showAuthoritiesList(body)
+      )
     );
 
-    const listTab = button(
-      "Autoridades registradas",
-      () => showAuthoritiesList(body)
-    );
-
-    tabs.append(newTab, listTab);
     content.append(tabs, body);
 
     try {
-      users = await rpc("as_listar_usuarios_institucionales");
+      users = await rpc(
+        "as_listar_usuarios_institucionales"
+      );
 
       if (!Array.isArray(users)) {
-        throw new Error("Formato de usuarios inesperado");
+        throw new Error(
+          "Formato de usuarios inesperado"
+        );
       }
 
       showAuthorityForm(body);
@@ -633,20 +1202,17 @@
 
   function showAuthorityForm(body) {
     body.replaceChildren();
-    body.append(node("h3", "Nueva habilitación"));
 
-    if (!centers.length) {
-      body.append(
-        node("p", "No hay establecimientos activos.")
-      );
-      return;
-    }
+    body.append(
+      node("h3", "Nueva habilitación")
+    );
 
-    if (!users.length) {
+    if (!centers.length || !users.length) {
       body.append(
         node(
           "p",
-          "No hay usuarios institucionales activos disponibles."
+          "No hay establecimientos o usuarios " +
+          "institucionales disponibles."
         )
       );
       return;
@@ -668,14 +1234,19 @@
       ])
     );
 
-    const type = selectField("Tipo de autoridad", [
-      ["direccion", "Dirección"],
-      ["comite_crisis", "Comité de Crisis"]
-    ]);
+    const type = selectField(
+      "Tipo de autoridad",
+      [
+        ["direccion", "Dirección"],
+        ["comite_crisis", "Comité de Crisis"]
+      ]
+    );
 
-    const position = inputField("Cargo institucional");
+    const position = inputField(
+      "Cargo institucional"
+    );
 
-    const document = inputField(
+    const documentField = inputField(
       "Documento o acto de designación"
     );
 
@@ -686,10 +1257,15 @@
     );
 
     const observations = textArea(
-      "Observaciones administrativas"
+      "Observaciones administrativas",
+      3000
     );
 
-    const submit = node("button", "Registrar habilitación");
+    const submit = node(
+      "button",
+      "Registrar habilitación"
+    );
+
     submit.type = "submit";
 
     form.append(
@@ -697,7 +1273,7 @@
       person.wrapper,
       type.wrapper,
       position.wrapper,
-      document.wrapper,
+      documentField.wrapper,
       until.wrapper,
       observations.wrapper,
       submit
@@ -710,10 +1286,6 @@
         u => u.usuario_id === person.input.value
       );
 
-      const selectedCenter = centerName(
-        center.input.value
-      );
-
       if (!selectedUser) {
         notice("Seleccioná un usuario válido.");
         return;
@@ -722,16 +1294,18 @@
       const confirmation = [
         "¿CONFIRMÁS ESTA HABILITACIÓN?",
         "",
-        "Establecimiento: " + selectedCenter,
+        "Establecimiento: " +
+          centerName(center.input.value),
         "Usuario: " + selectedUser.nombre,
         "Correo: " + selectedUser.correo,
         "Autoridad: " +
           type.input.selectedOptions[0].text,
         "Cargo: " + position.input.value.trim(),
-        "Designación: " + document.input.value.trim(),
+        "Designación: " +
+          documentField.input.value.trim(),
         "",
-        "Confirmá únicamente si existe " +
-          "una designación institucional válida."
+        "Confirmá únicamente si existe una " +
+        "designación institucional válida."
       ].join("\n");
 
       if (!window.confirm(confirmation)) return;
@@ -746,18 +1320,22 @@
           p_tipo_autoridad: type.input.value,
           p_cargo: position.input.value.trim(),
           p_documento_designacion:
-            document.input.value.trim(),
-          p_habilitado_desde: new Date().toISOString(),
-          p_habilitado_hasta: until.input.value
-            ? new Date(until.input.value).toISOString()
-            : null,
+            documentField.input.value.trim(),
+          p_habilitado_desde:
+            new Date().toISOString(),
+          p_habilitado_hasta:
+            until.input.value
+              ? new Date(
+                  until.input.value
+                ).toISOString()
+              : null,
           p_observaciones:
             observations.input.value.trim() || null
         });
 
         notice(
           "Habilitación registrada correctamente. " +
-          "No se publicó ningún estado."
+          "No se publicó información."
         );
 
         await showAuthoritiesList(body);
@@ -767,6 +1345,7 @@
           "No se pudo registrar la habilitación: " +
           error.message
         );
+
       } finally {
         submit.disabled = false;
       }
@@ -777,7 +1356,10 @@
 
   async function showAuthoritiesList(body) {
     body.replaceChildren();
-    body.append(node("h3", "Autoridades registradas"));
+
+    body.append(
+      node("h3", "Autoridades registradas")
+    );
 
     const filters = node("div", null, "as-card");
 
@@ -785,15 +1367,20 @@
       "Filtrar por establecimiento",
       [
         ["", "Todos los establecimientos"],
-        ...centers.map(c => [String(c.id), c.nombre])
+        ...centers.map(
+          c => [String(c.id), c.nombre]
+        )
       ]
     );
 
-    const statusFilter = selectField("Estado", [
-      ["", "Todas"],
-      ["vigente", "Vigentes"],
-      ["no_vigente", "No vigentes"]
-    ]);
+    const statusFilter = selectField(
+      "Estado",
+      [
+        ["", "Todas"],
+        ["vigente", "Vigentes"],
+        ["no_vigente", "No vigentes"]
+      ]
+    );
 
     const list = node("div");
 
@@ -812,7 +1399,8 @@
       const filtered = rows.filter(a => {
         const centerMatches =
           !centerFilter.input.value ||
-          String(a.centro_id) === centerFilter.input.value;
+          String(a.centro_id) ===
+            centerFilter.input.value;
 
         const valid = activeAuthority(a);
 
@@ -837,20 +1425,27 @@
         );
       }
 
-      for (const a of filtered) {
+      for (const authority of filtered) {
         const person = users.find(
-          u => u.usuario_id === a.usuario_id
+          u => u.usuario_id === authority.usuario_id
         );
 
-        const card = node("article", null, "as-card");
+        const card = node(
+          "article",
+          null,
+          "as-card"
+        );
 
         card.append(
-          node("h3", centerName(a.centro_id)),
+          node(
+            "h3",
+            centerName(authority.centro_id)
+          ),
           node(
             "p",
             "Autoridad: " +
             (
-              a.tipo_autoridad === "direccion"
+              authority.tipo_autoridad === "direccion"
                 ? "Dirección"
                 : "Comité de Crisis"
             )
@@ -858,38 +1453,53 @@
           node(
             "p",
             "Persona: " +
-            (person?.nombre || "Usuario no disponible")
+            (
+              person?.nombre ||
+              "Usuario no disponible"
+            )
           ),
           node(
             "p",
             "Correo: " +
-            (person?.correo || "No disponible")
-          ),
-          node("p", "Cargo: " + a.cargo),
-          node(
-            "p",
-            "Designación: " + a.documento_designacion
+            (
+              person?.correo ||
+              "No disponible"
+            )
           ),
           node(
             "p",
-            "Desde: " + dateText(a.habilitado_desde)
+            "Cargo: " + authority.cargo
           ),
           node(
             "p",
-            "Hasta: " + dateText(a.habilitado_hasta)
+            "Designación: " +
+            authority.documento_designacion
+          ),
+          node(
+            "p",
+            "Desde: " +
+            dateText(authority.habilitado_desde)
+          ),
+          node(
+            "p",
+            "Hasta: " +
+            dateText(authority.habilitado_hasta)
           ),
           node(
             "p",
             "Estado: " +
             (
-              activeAuthority(a)
+              activeAuthority(authority)
                 ? "Vigente"
                 : "No vigente"
             )
           )
         );
 
-        if (a.activo && !a.revocado_en) {
+        if (
+          authority.activo &&
+          !authority.revocado_en
+        ) {
           card.append(
             button(
               "Revocar habilitación",
@@ -912,13 +1522,18 @@
                 if (!window.confirm(
                   "¿Confirmás la revocación inmediata " +
                   "de esta habilitación?"
-                )) return;
+                )) {
+                  return;
+                }
 
                 try {
-                  await rpc("as_revocar_autoridad", {
-                    p_autorizacion_id: a.id,
-                    p_motivo: reason.trim()
-                  });
+                  await rpc(
+                    "as_revocar_autoridad",
+                    {
+                      p_autorizacion_id: authority.id,
+                      p_motivo: reason.trim()
+                    }
+                  );
 
                   notice(
                     "Habilitación revocada correctamente."
@@ -928,7 +1543,8 @@
 
                 } catch (error) {
                   notice(
-                    "No se pudo revocar: " + error.message
+                    "No se pudo revocar: " +
+                    error.message
                   );
                 }
               },
@@ -941,8 +1557,15 @@
       }
     }
 
-    centerFilter.input.addEventListener("change", render);
-    statusFilter.input.addEventListener("change", render);
+    centerFilter.input.addEventListener(
+      "change",
+      render
+    );
+
+    statusFilter.input.addEventListener(
+      "change",
+      render
+    );
 
     try {
       rows = await rest(
@@ -963,5 +1586,14 @@
     }
   }
 
+  // =========================================
+  // INICIO
+  // =========================================
+
   login();
+
+  console.info(
+    "App Alerta Salud: panel institucional V1.9.7"
+  );
+
 })();
