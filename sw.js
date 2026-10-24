@@ -1,7 +1,10 @@
 
-/* App Alerta Salud V1.9 - Service Worker */
+/*
+ * APP ALERTA SALUD V1.9.1
+ * Service Worker
+ */
 
-const CACHE = "alerta-salud-v1-9-0";
+const CACHE = "alerta-salud-v1-9-1";
 
 const ASSETS = [
   "./",
@@ -44,7 +47,7 @@ self.addEventListener("fetch", event => {
 
   if (request.method !== "GET") return;
 
-  // Nunca almacenar respuestas privadas de Supabase.
+  // Nunca guardar respuestas privadas de Supabase.
   if (url.origin !== self.location.origin) return;
 
   event.respondWith(
