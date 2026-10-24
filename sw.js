@@ -1,10 +1,10 @@
 
 /*
- * APP ALERTA SALUD V1.9.1
+ * APP ALERTA SALUD V1.9.4
  * Service Worker
  */
 
-const CACHE = "alerta-salud-v1-9-1";
+const CACHE = "alerta-salud-v1-9-4";
 
 const ASSETS = [
   "./",
@@ -21,7 +21,9 @@ const ASSETS = [
 
 self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE).then(cache => cache.addAll(ASSETS))
+    caches.open(CACHE).then(cache =>
+      cache.addAll(ASSETS)
+    )
   );
 
   self.skipWaiting();
@@ -32,7 +34,10 @@ self.addEventListener("activate", event => {
     caches.keys().then(keys =>
       Promise.all(
         keys
-          .filter(key => key !== CACHE)
+          .filter(key =>
+            key.startsWith("alerta-salud-") &&
+            key !== CACHE
+          )
           .map(key => caches.delete(key))
       )
     )
@@ -43,29 +48,51 @@ self.addEventListener("activate", event => {
 
 self.addEventListener("fetch", event => {
   const request = event.request;
-  const url = new URL(request.url);
 
   if (request.method !== "GET") return;
 
-  // Nunca guardar respuestas privadas de Supabase.
-  if (url.origin !== self.location.origin) return;
+  const url = new URL(request.url);
 
+  // No interceptar APIs externas ni Supabase.
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
+  // Las navegaciones usan primero la red.
+  // Si no hay conexión, se usa el HTML
+  // previamente almacenado.
+  if (request.mode === "navigate") {
+    event.respondWith(
+      fetch(request).catch(async () => {
+        return (
+          await caches.match("./index.html")
+        ) || Response.error();
+      })
+    );
+    return;
+  }
+
+  // Recursos locales: red primero,
+  // caché como respaldo.
   event.respondWith(
     fetch(request)
       .then(response => {
         if (response.ok) {
           const copy = response.clone();
 
-          caches.open(CACHE).then(cache => {
-            cache.put(request, copy);
-          });
+          event.waitUntil(
+            caches.open(CACHE).then(cache =>
+              cache.put(request, copy)
+            )
+          );
         }
 
         return response;
       })
       .catch(async () => {
-        const cached = await caches.match(request);
-        return cached || Response.error();
+        return (
+          await caches.match(request)
+        ) || Response.error();
       })
   );
 });
