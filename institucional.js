@@ -1,11 +1,15 @@
 
 /*
- * APP ALERTA SALUD V1.9.1
- * Panel de autoridades y declaraciones oficiales
+ * APP ALERTA SALUD V1.9.3
+ * Gestión de autoridades y declaraciones oficiales.
  *
- * Requiere SQL 14A, 14B, 14C y 14D.
- * La autorización efectiva se comprueba en Supabase.
- * No almacena contraseñas ni sesiones en localStorage.
+ * Requiere:
+ * - supabase-config.js
+ * - SQL 14A, 14B, 14C, 14D
+ * - SQL 14E.3A: as_listar_usuarios_institucionales
+ *
+ * No modifica estados al iniciar.
+ * Publica únicamente tras confirmación expresa.
  */
 
 (() => {
@@ -17,26 +21,25 @@
   if (!cfg?.url || !cfg?.publishableKey || !host) return;
 
   const API = cfg.url.replace(/\/$/, "");
-
   let token = null;
   let user = null;
   let profile = null;
-  let authorities = [];
   let centers = [];
+  let authorities = [];
+  let users = [];
 
-  const css = document.createElement("style");
-  css.textContent = `
+  const style = document.createElement("style");
+  style.textContent = `
     .as-panel {
       margin: 20px 0;
-      padding: 18px;
+      padding: 16px;
+      border: 1px solid #d5e0e9;
+      border-radius: 13px;
       background: #fff;
-      color: #172b3a;
-      border: 1px solid #d7e1ea;
-      border-radius: 14px;
+      color: #173047;
     }
-    .as-panel h2, .as-panel h3 {
-      margin: 0 0 12px;
-    }
+    .as-panel h2 { margin: 0 0 12px; }
+    .as-panel h3 { margin: 14px 0 8px; }
     .as-panel label {
       display: block;
       margin: 12px 0;
@@ -50,20 +53,20 @@
       box-sizing: border-box;
       margin-top: 5px;
       padding: 10px;
-      border: 1px solid #aebdca;
+      border: 1px solid #afc0ce;
       border-radius: 8px;
-      background: white;
-      color: #172b3a;
+      background: #fff;
+      color: #173047;
       font: inherit;
       font-weight: 400;
     }
     .as-panel button {
-      padding: 10px 14px;
-      margin: 5px 6px 5px 0;
-      background: #14618b;
-      color: white;
+      padding: 10px 13px;
+      margin: 4px 5px 4px 0;
       border: 0;
       border-radius: 8px;
+      background: #14618b;
+      color: white;
       font: inherit;
       cursor: pointer;
     }
@@ -71,106 +74,107 @@
       opacity: .55;
       cursor: wait;
     }
-    .as-panel button.as-secondary {
-      background: #475569;
-    }
-    .as-panel button.as-danger {
-      background: #a72b35;
-    }
-    .as-message {
-      padding: 12px;
-      margin: 12px 0;
-      background: #edf5fb;
+    .as-panel .as-secondary { background: #475569; }
+    .as-panel .as-danger { background: #a72b35; }
+    .as-panel .as-message {
+      padding: 11px;
+      margin: 10px 0;
       border-radius: 8px;
+      background: #eaf3fa;
       white-space: pre-wrap;
+      overflow-wrap: anywhere;
     }
-    .as-card {
-      padding: 14px;
+    .as-panel .as-card {
       margin: 12px 0;
-      border: 1px solid #d7e1ea;
+      padding: 13px;
+      border: 1px solid #d5e0e9;
       border-radius: 10px;
     }
-    .as-card p {
-      margin: 7px 0;
-    }
-    .as-muted {
-      color: #526577;
+    .as-panel .as-card p { margin: 6px 0; }
+    .as-panel .as-muted {
       font-size: .9rem;
+      color: #526577;
     }
-    .as-actions {
+    .as-panel .as-tabs {
       display: flex;
       flex-wrap: wrap;
-      gap: 6px;
+      gap: 5px;
+      margin: 12px 0;
+    }
+    .as-panel .as-tabs button {
+      flex: 1;
+      min-width: 110px;
+    }
+    .as-panel .as-active-tab {
+      background: #0c354f;
     }
   `;
-  document.head.appendChild(css);
+  document.head.append(style);
 
-  function el(tag, text, className) {
-    const node = document.createElement(tag);
+  function node(tag, text, className) {
+    const item = document.createElement(tag);
     if (text !== undefined && text !== null) {
-      node.textContent = String(text);
+      item.textContent = String(text);
     }
-    if (className) node.className = className;
-    return node;
+    if (className) item.className = className;
+    return item;
   }
 
-  function btn(text, fn, className = "") {
-    const b = el("button", text, className);
-    b.type = "button";
-    b.addEventListener("click", fn);
-    return b;
+  function button(text, action, className = "") {
+    const item = node("button", text, className);
+    item.type = "button";
+    item.addEventListener("click", action);
+    return item;
   }
 
-  function field(label, type = "text") {
-    const wrap = el("label", label);
-    const input = el("input");
+  function inputField(label, type = "text", required = true) {
+    const wrapper = node("label", label);
+    const input = node("input");
     input.type = type;
-    input.required = true;
-    wrap.append(input);
-    return { wrap, input };
+    input.required = required;
+    wrapper.append(input);
+    return { wrapper, input };
   }
 
-  function select(label, options) {
-    const wrap = el("label", label);
-    const input = el("select");
+  function selectField(label, options) {
+    const wrapper = node("label", label);
+    const input = node("select");
 
-    for (const [value, name] of options) {
-      const option = el("option", name);
-      option.value = value;
+    for (const [value, title] of options) {
+      const option = node("option", title);
+      option.value = String(value);
       input.append(option);
     }
 
-    wrap.append(input);
-    return { wrap, input };
+    wrapper.append(input);
+    return { wrapper, input };
   }
 
-  function textarea(label) {
-    const wrap = el("label", label);
-    const input = el("textarea");
-    input.rows = 4;
+  function textArea(label) {
+    const wrapper = node("label", label);
+    const input = node("textarea");
+    input.rows = 3;
     input.maxLength = 3000;
-    wrap.append(input);
-    return { wrap, input };
+    wrapper.append(input);
+    return { wrapper, input };
   }
 
   function dateText(value) {
-    if (!value) return "Sin fecha";
-    const date = new Date(value);
-    return Number.isNaN(date.getTime())
-      ? "Fecha no disponible"
-      : date.toLocaleString("es-AR");
+    if (!value) return "Sin fecha de finalización";
+    const d = new Date(value);
+    return Number.isNaN(d.getTime())
+      ? "Fecha inválida"
+      : d.toLocaleString("es-AR");
   }
 
   async function request(path, options = {}) {
     const headers = {
       apikey: cfg.publishableKey,
       Accept: "application/json",
-      ...(options.headers || {})
+      ...options.headers
     };
 
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
+    if (token) headers.Authorization = `Bearer ${token}`;
 
     const response = await fetch(API + path, {
       ...options,
@@ -178,49 +182,47 @@
       cache: "no-store"
     });
 
-    const body = await response.json().catch(() => null);
+    const result = await response.json().catch(() => null);
 
     if (!response.ok) {
       throw new Error(
-        body?.message ||
-        body?.error_description ||
-        body?.error ||
+        result?.message ||
+        result?.error_description ||
+        result?.error ||
         `Error HTTP ${response.status}`
       );
     }
 
-    return body;
+    return result;
   }
 
   function rest(table, query) {
     return request(`/rest/v1/${table}?${query}`);
   }
 
-  function rpc(name, args) {
+  function rpc(name, args = {}) {
     return request(`/rest/v1/rpc/${name}`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(args)
     });
   }
 
-  const panel = el("section", null, "as-panel");
-  const heading = el("h2", "Acceso institucional");
-  const message = el("div", "", "as-message");
-  const content = el("div");
+  const panel = node("section", null, "as-panel");
+  const title = node("h2", "Acceso institucional");
+  const message = node("div", "", "as-message");
+  const content = node("div");
 
   message.setAttribute("role", "status");
-  panel.append(heading, message, content);
+  panel.append(title, message, content);
   host.append(panel);
 
   function notice(text) {
-    message.textContent = text;
+    message.textContent = String(text);
   }
 
-  function clear(title) {
-    heading.textContent = title;
+  function screen(heading) {
+    title.textContent = heading;
     content.replaceChildren();
   }
 
@@ -231,45 +233,48 @@
 
   function activeAuthority(a) {
     const now = Date.now();
-    return (
-      a.activo === true &&
+
+    return a.activo === true &&
       !a.revocado_en &&
       Date.parse(a.habilitado_desde) <= now &&
       (
         !a.habilitado_hasta ||
         Date.parse(a.habilitado_hasta) > now
-      )
-    );
+      );
+  }
+
+  function isSuperadmin() {
+    return profile?.activo === true &&
+      profile?.rol === "superadmin";
   }
 
   function logout() {
     token = null;
     user = null;
     profile = null;
-    authorities = [];
     centers = [];
-    showLogin();
+    authorities = [];
+    users = [];
+    login();
   }
 
-  function showLogin() {
-    clear("Acceso institucional");
-
+  function login() {
+    screen("Acceso institucional");
     notice(
       "Ingreso exclusivo para Dirección, Comité de Crisis " +
       "y administradores autorizados."
     );
 
-    const form = el("form");
-    const email = field("Correo electrónico", "email");
-    const password = field("Contraseña", "password");
+    const form = node("form");
+    const email = inputField("Correo electrónico", "email");
+    const password = inputField("Contraseña", "password");
+    const submit = node("button", "Ingresar");
 
     email.input.autocomplete = "username";
     password.input.autocomplete = "current-password";
-
-    const submit = el("button", "Ingresar");
     submit.type = "submit";
 
-    form.append(email.wrap, password.wrap, submit);
+    form.append(email.wrapper, password.wrapper, submit);
 
     form.addEventListener("submit", async event => {
       event.preventDefault();
@@ -295,10 +300,12 @@
         user = session.user;
 
         await loadIdentity();
-        await dashboard();
+        dashboard();
 
       } catch (error) {
-        logout();
+        token = null;
+        user = null;
+        profile = null;
         notice("No se pudo ingresar: " + error.message);
       } finally {
         submit.disabled = false;
@@ -332,105 +339,98 @@
       "&usuario_id=eq." + encodeURIComponent(user.id)
     );
 
-    const isSuper = (
+    const hasInstitutionalRole =
       profile?.activo === true &&
-      profile?.rol === "superadmin"
-    );
-
-    const isAdmin = (
-      profile?.activo === true &&
-      profile?.rol === "admin"
-    );
+      ["superadmin", "admin"].includes(profile.rol);
 
     if (
-      !isSuper &&
-      !isAdmin &&
+      !hasInstitutionalRole &&
       !authorities.some(activeAuthority)
     ) {
       throw new Error(
-        "La cuenta no tiene una habilitación institucional vigente."
+        "No existe una habilitación institucional vigente."
       );
     }
   }
 
-  async function dashboard() {
-    clear("Panel institucional");
+  function dashboard() {
+    screen("Panel institucional");
 
     notice(
-      `${profile?.nombre || user.email || "Usuario"}\n` +
-      "La publicación de estados está reservada a " +
-      "autoridades institucionales previamente habilitadas."
+      `${profile?.nombre || user?.email || "Usuario"}\n` +
+      "La publicación de estados está reservada " +
+      "a autoridades previamente habilitadas."
     );
 
-    const actions = el("div", null, "as-actions");
-    actions.append(
-      btn("Actualizar", async () => {
+    content.append(
+      button("Actualizar", async () => {
         try {
           await loadIdentity();
-          await dashboard();
+          dashboard();
         } catch (error) {
           notice(error.message);
         }
       }),
-      btn("Cerrar sesión", logout, "as-secondary")
+      button("Cerrar sesión", logout, "as-secondary")
     );
-
-    content.append(actions);
 
     const own = authorities.filter(activeAuthority);
 
     if (own.length) {
-      const box = el("section", null, "as-card");
-      box.append(
-        el("h3", "Declaraciones institucionales")
+      const section = node("section", null, "as-card");
+      section.append(
+        node("h3", "Declaraciones institucionales")
       );
 
-      for (const a of own) {
-        const card = el("div", null, "as-card");
+      for (const authority of own) {
+        const card = node("div", null, "as-card");
 
         card.append(
-          el("h3", centerName(a.centro_id)),
-          el(
+          node("h3", centerName(authority.centro_id)),
+          node(
             "p",
-            a.tipo_autoridad === "direccion"
-              ? "Autoridad: Dirección"
-              : "Autoridad: Comité de Crisis"
+            authority.tipo_autoridad === "direccion"
+              ? "Dirección"
+              : "Comité de Crisis"
           ),
-          el("p", "Cargo: " + a.cargo),
-          btn(
+          node("p", authority.cargo),
+          button(
             "Declarar estado operativo",
-            () => declarationForm(a)
+            () => declarationForm(authority)
           )
         );
 
-        box.append(card);
+        section.append(card);
       }
 
-      content.append(box);
+      content.append(section);
     }
 
-    if (profile?.activo && profile.rol === "superadmin") {
-      const box = el("section", null, "as-card");
-      box.append(
-        el("h3", "Administración de autoridades"),
-        el(
+    if (isSuperadmin()) {
+      const section = node("section", null, "as-card");
+
+      section.append(
+        node("h3", "Administración de autoridades"),
+        node(
           "p",
-          "Registrar o revocar designaciones institucionales."
+          "Registrar, consultar y revocar " +
+          "designaciones institucionales."
         ),
-        btn(
+        button(
           "Gestionar autoridades",
           authoritiesAdmin
         )
       );
-      content.append(box);
+
+      content.append(section);
     }
 
-    if (!own.length && profile?.rol !== "superadmin") {
+    if (!own.length && !isSuperadmin()) {
       content.append(
-        el(
+        node(
           "p",
-          "No tenés establecimientos habilitados para " +
-          "publicar estados operativos.",
+          "No tenés establecimientos habilitados " +
+          "para publicar estados.",
           "as-muted"
         )
       );
@@ -438,50 +438,50 @@
   }
 
   function declarationForm(authority) {
-    clear("Declaración oficial");
+    screen("Declaración oficial");
 
     notice(
       "Establecimiento: " +
       centerName(authority.centro_id) +
-      "\nEsta acción publica información REAL " +
-      "inmediatamente en el sistema."
+      "\nATENCIÓN: la confirmación publica " +
+      "información real inmediatamente."
     );
 
     content.append(
-      btn("Volver", dashboard, "as-secondary")
+      button("Volver", dashboard, "as-secondary")
     );
 
-    const form = el("form");
+    const form = node("form");
 
-    const operation = select("Funcionamiento", [
+    const operation = selectField("Funcionamiento", [
       ["sin_verificar", "Sin verificar"],
       ["operativo", "Operativo"],
       ["parcial", "Operativo parcialmente"],
       ["suspendido", "Atención suspendida"]
     ]);
 
-    const reception = select("Recepción de pacientes", [
+    const reception = selectField("Recepción de pacientes", [
       ["sin_verificar", "Sin verificar"],
       ["recibe", "Recibe pacientes"],
       ["limitada", "Recepción limitada"],
       ["no_recibe", "No recibe pacientes"]
     ]);
 
-    const access = select("Accesibilidad", [
+    const access = selectField("Accesibilidad", [
       ["sin_verificar", "Sin verificar"],
       ["accesible", "Accesible"],
       ["restringido", "Acceso restringido"],
       ["interrumpido", "Acceso interrumpido"]
     ]);
 
-    const energy = select("Suministro eléctrico", [
+    const energy = selectField("Suministro eléctrico", [
       ["sin_verificar", "Sin verificar"],
       ["normal", "Normal"],
       ["afectado", "Afectado"],
       ["sin_servicio", "Sin servicio"]
     ]);
 
-    const validity = select("Vigencia del aviso", [
+    const validity = selectField("Vigencia del aviso", [
       ["1", "1 hora"],
       ["3", "3 horas"],
       ["6", "6 horas"],
@@ -491,23 +491,23 @@
 
     validity.input.value = "6";
 
-    const observations = textarea(
+    const observations = textArea(
       "Observaciones y acciones de respuesta"
     );
 
-    const submit = el(
+    const submit = node(
       "button",
       "Revisar y publicar declaración"
     );
     submit.type = "submit";
 
     form.append(
-      operation.wrap,
-      reception.wrap,
-      access.wrap,
-      energy.wrap,
-      validity.wrap,
-      observations.wrap,
+      operation.wrapper,
+      reception.wrapper,
+      access.wrapper,
+      energy.wrapper,
+      validity.wrapper,
+      observations.wrapper,
       submit
     );
 
@@ -520,18 +520,19 @@
         p_recepcion_pacientes: reception.input.value,
         p_accesibilidad: access.input.value,
         p_energia: energy.input.value,
-        p_observaciones: observations.input.value.trim(),
+        p_observaciones:
+          observations.input.value.trim() || null,
         p_vigencia_horas: Number(validity.input.value)
       };
 
-      if (
-        [
-          values.p_operatividad,
-          values.p_recepcion_pacientes,
-          values.p_accesibilidad,
-          values.p_energia
-        ].every(v => v === "sin_verificar")
-      ) {
+      const allUnknown = [
+        values.p_operatividad,
+        values.p_recepcion_pacientes,
+        values.p_accesibilidad,
+        values.p_energia
+      ].every(value => value === "sin_verificar");
+
+      if (allUnknown) {
         notice(
           "Debés informar al menos una condición verificada."
         );
@@ -543,14 +544,19 @@
         "",
         centerName(authority.centro_id),
         "",
-        "Funcionamiento: " + operation.input.selectedOptions[0].text,
-        "Recepción: " + reception.input.selectedOptions[0].text,
-        "Accesibilidad: " + access.input.selectedOptions[0].text,
-        "Energía: " + energy.input.selectedOptions[0].text,
-        "Vigencia: " + validity.input.selectedOptions[0].text,
+        "Funcionamiento: " +
+          operation.input.selectedOptions[0].text,
+        "Recepción: " +
+          reception.input.selectedOptions[0].text,
+        "Accesibilidad: " +
+          access.input.selectedOptions[0].text,
+        "Energía: " +
+          energy.input.selectedOptions[0].text,
+        "Vigencia: " +
+          validity.input.selectedOptions[0].text,
         "",
         "La información será pública inmediatamente.",
-        "Quedará registrada bajo tu identidad institucional."
+        "Quedará registrada bajo tu identidad."
       ].join("\n");
 
       if (!window.confirm(summary)) return;
@@ -564,19 +570,16 @@
           values
         );
 
-        await dashboard();
+        dashboard();
 
         notice(
           "Declaración publicada correctamente.\n" +
           "Identificador: " + id +
-          "\nPodés realizar una nueva actualización " +
-          "en cualquier momento."
+          "\nPodés actualizar nuevamente en cualquier momento."
         );
 
       } catch (error) {
-        notice(
-          "No se pudo publicar: " + error.message
-        );
+        notice("No se pudo publicar: " + error.message);
         submit.disabled = false;
       }
     });
@@ -585,77 +588,161 @@
   }
 
   async function authoritiesAdmin() {
-    clear("Gestión de autoridades");
-
+    screen("Gestión de autoridades");
     notice(
       "Las habilitaciones requieren designación previa. " +
       "Registrar una autoridad no publica estados."
     );
 
     content.append(
-      btn("Volver al panel", dashboard, "as-secondary")
+      button("Volver al panel", dashboard, "as-secondary")
     );
 
-    const form = el("form");
+    const tabs = node("div", null, "as-tabs");
+    const body = node("div");
 
-    const center = select(
+    const newTab = button(
+      "Nueva habilitación",
+      () => showAuthorityForm(body)
+    );
+
+    const listTab = button(
+      "Autoridades registradas",
+      () => showAuthoritiesList(body)
+    );
+
+    tabs.append(newTab, listTab);
+    content.append(tabs, body);
+
+    try {
+      users = await rpc("as_listar_usuarios_institucionales");
+
+      if (!Array.isArray(users)) {
+        throw new Error("Formato de usuarios inesperado");
+      }
+
+      showAuthorityForm(body);
+
+    } catch (error) {
+      notice(
+        "No se pudo obtener el listado de usuarios: " +
+        error.message
+      );
+    }
+  }
+
+  function showAuthorityForm(body) {
+    body.replaceChildren();
+    body.append(node("h3", "Nueva habilitación"));
+
+    if (!centers.length) {
+      body.append(
+        node("p", "No hay establecimientos activos.")
+      );
+      return;
+    }
+
+    if (!users.length) {
+      body.append(
+        node(
+          "p",
+          "No hay usuarios institucionales activos disponibles."
+        )
+      );
+      return;
+    }
+
+    const form = node("form");
+
+    const center = selectField(
       "Establecimiento",
-      centers.map(c => [String(c.id), c.nombre])
+      centers.map(c => [c.id, c.nombre])
     );
 
-    const userId = field(
-      "UUID del usuario registrado en Supabase Auth"
+    const person = selectField(
+      "Usuario institucional",
+      users.map(u => [
+        u.usuario_id,
+        `${u.nombre || "Sin nombre"} — ` +
+        `${u.correo || "Sin correo"}`
+      ])
     );
 
-    const type = select("Tipo de autoridad", [
+    const type = selectField("Tipo de autoridad", [
       ["direccion", "Dirección"],
       ["comite_crisis", "Comité de Crisis"]
     ]);
 
-    const position = field("Cargo institucional");
-    const document = field(
+    const position = inputField("Cargo institucional");
+
+    const document = inputField(
       "Documento o acto de designación"
     );
 
-    const until = field(
+    const until = inputField(
       "Fecha de finalización (opcional)",
-      "datetime-local"
+      "datetime-local",
+      false
     );
-    until.input.required = false;
 
-    const observations = textarea(
+    const observations = textArea(
       "Observaciones administrativas"
     );
 
-    const submit = el("button", "Registrar habilitación");
+    const submit = node("button", "Registrar habilitación");
     submit.type = "submit";
 
     form.append(
-      center.wrap,
-      userId.wrap,
-      type.wrap,
-      position.wrap,
-      document.wrap,
-      until.wrap,
-      observations.wrap,
+      center.wrapper,
+      person.wrapper,
+      type.wrapper,
+      position.wrapper,
+      document.wrapper,
+      until.wrapper,
+      observations.wrapper,
       submit
     );
 
     form.addEventListener("submit", async event => {
       event.preventDefault();
 
-      if (!window.confirm(
-        "¿Confirmás que existe una designación institucional " +
-        "previa y válida para esta persona?"
-      )) return;
+      const selectedUser = users.find(
+        u => u.usuario_id === person.input.value
+      );
+
+      const selectedCenter = centerName(
+        center.input.value
+      );
+
+      if (!selectedUser) {
+        notice("Seleccioná un usuario válido.");
+        return;
+      }
+
+      const confirmation = [
+        "¿CONFIRMÁS ESTA HABILITACIÓN?",
+        "",
+        "Establecimiento: " + selectedCenter,
+        "Usuario: " + selectedUser.nombre,
+        "Correo: " + selectedUser.correo,
+        "Autoridad: " +
+          type.input.selectedOptions[0].text,
+        "Cargo: " + position.input.value.trim(),
+        "Designación: " + document.input.value.trim(),
+        "",
+        "Confirmá únicamente si existe " +
+          "una designación institucional válida."
+      ].join("\n");
+
+      if (!window.confirm(confirmation)) return;
 
       submit.disabled = true;
-      notice("Registrando autorización…");
+      notice("Registrando habilitación…");
 
       try {
         await rpc("as_habilitar_autoridad", {
           p_centro_id: Number(center.input.value),
-          p_usuario_id: userId.input.value.trim(),
+          p_usuario_id: person.input.value,
           p_tipo_autoridad: type.input.value,
           p_cargo: position.input.value.trim(),
           p_documento_designacion:
@@ -669,92 +756,134 @@
         });
 
         notice(
-          "Autoridad habilitada. " +
-          "La designación quedó registrada."
+          "Habilitación registrada correctamente. " +
+          "No se publicó ningún estado."
         );
 
-        await showAuthoritiesList();
+        await showAuthoritiesList(body);
 
       } catch (error) {
         notice(
-          "No se pudo habilitar: " + error.message
+          "No se pudo registrar la habilitación: " +
+          error.message
         );
       } finally {
         submit.disabled = false;
       }
     });
 
-    content.append(
-      el("h3", "Nueva habilitación"),
-      form,
-      el("h3", "Habilitaciones registradas")
-    );
-
-    await showAuthoritiesList();
+    body.append(form);
   }
 
-  async function showAuthoritiesList() {
-    let list = document.getElementById("as-authorities-list");
+  async function showAuthoritiesList(body) {
+    body.replaceChildren();
+    body.append(node("h3", "Autoridades registradas"));
 
-    if (!list) {
-      list = el("div");
-      list.id = "as-authorities-list";
-      content.append(list);
-    }
+    const filters = node("div", null, "as-card");
 
-    list.replaceChildren();
+    const centerFilter = selectField(
+      "Filtrar por establecimiento",
+      [
+        ["", "Todos los establecimientos"],
+        ...centers.map(c => [String(c.id), c.nombre])
+      ]
+    );
 
-    try {
-      const rows = await rest(
-        "as_autoridades_institucionales",
-        "select=id,centro_id,usuario_id,tipo_autoridad," +
-        "cargo,documento_designacion,activo," +
-        "habilitado_desde,habilitado_hasta,revocado_en" +
-        "&order=creado_en.desc&limit=100"
-      );
+    const statusFilter = selectField("Estado", [
+      ["", "Todas"],
+      ["vigente", "Vigentes"],
+      ["no_vigente", "No vigentes"]
+    ]);
 
-      if (!rows.length) {
+    const list = node("div");
+
+    filters.append(
+      centerFilter.wrapper,
+      statusFilter.wrapper
+    );
+
+    body.append(filters, list);
+
+    let rows = [];
+
+    function render() {
+      list.replaceChildren();
+
+      const filtered = rows.filter(a => {
+        const centerMatches =
+          !centerFilter.input.value ||
+          String(a.centro_id) === centerFilter.input.value;
+
+        const valid = activeAuthority(a);
+
+        const statusMatches =
+          !statusFilter.input.value ||
+          (
+            statusFilter.input.value === "vigente"
+              ? valid
+              : !valid
+          );
+
+        return centerMatches && statusMatches;
+      });
+
+      if (!filtered.length) {
         list.append(
-          el("p", "Todavía no hay autoridades registradas.")
+          node(
+            "p",
+            "No hay habilitaciones que coincidan " +
+            "con los filtros."
+          )
         );
       }
 
-      for (const a of rows) {
-        const card = el("article", null, "as-card");
+      for (const a of filtered) {
+        const person = users.find(
+          u => u.usuario_id === a.usuario_id
+        );
+
+        const card = node("article", null, "as-card");
 
         card.append(
-          el("h3", centerName(a.centro_id)),
-          el(
+          node("h3", centerName(a.centro_id)),
+          node(
             "p",
-            a.tipo_autoridad === "direccion"
-              ? "Dirección"
-              : "Comité de Crisis"
+            "Autoridad: " +
+            (
+              a.tipo_autoridad === "direccion"
+                ? "Dirección"
+                : "Comité de Crisis"
+            )
           ),
-          el("p", "Cargo: " + a.cargo),
-          el("p", "Usuario: " + a.usuario_id),
-          el(
+          node(
+            "p",
+            "Persona: " +
+            (person?.nombre || "Usuario no disponible")
+          ),
+          node(
+            "p",
+            "Correo: " +
+            (person?.correo || "No disponible")
+          ),
+          node("p", "Cargo: " + a.cargo),
+          node(
             "p",
             "Designación: " + a.documento_designacion
           ),
-          el(
+          node(
             "p",
             "Desde: " + dateText(a.habilitado_desde)
           ),
-          el(
+          node(
             "p",
-            "Hasta: " +
-            (
-              a.habilitado_hasta
-                ? dateText(a.habilitado_hasta)
-                : "Sin fecha de finalización"
-            )
+            "Hasta: " + dateText(a.habilitado_hasta)
           ),
-          el(
+          node(
             "p",
             "Estado: " +
             (
               activeAuthority(a)
-                ? "Habilitación vigente"
+                ? "Vigente"
                 : "No vigente"
             )
           )
@@ -762,11 +891,11 @@
 
         if (a.activo && !a.revocado_en) {
           card.append(
-            btn(
+            button(
               "Revocar habilitación",
               async () => {
                 const reason = window.prompt(
-                  "Indicá el motivo de revocación " +
+                  "Motivo de revocación " +
                   "(mínimo 10 caracteres):"
                 );
 
@@ -774,13 +903,15 @@
 
                 if (reason.trim().length < 10) {
                   notice(
-                    "El motivo debe tener al menos 10 caracteres."
+                    "El motivo debe tener al menos " +
+                    "10 caracteres."
                   );
                   return;
                 }
 
                 if (!window.confirm(
-                  "¿Confirmás la revocación inmediata?"
+                  "¿Confirmás la revocación inmediata " +
+                  "de esta habilitación?"
                 )) return;
 
                 try {
@@ -789,8 +920,11 @@
                     p_motivo: reason.trim()
                   });
 
-                  notice("Habilitación revocada.");
-                  await showAuthoritiesList();
+                  notice(
+                    "Habilitación revocada correctamente."
+                  );
+
+                  await showAuthoritiesList(body);
 
                 } catch (error) {
                   notice(
@@ -805,15 +939,29 @@
 
         list.append(card);
       }
+    }
+
+    centerFilter.input.addEventListener("change", render);
+    statusFilter.input.addEventListener("change", render);
+
+    try {
+      rows = await rest(
+        "as_autoridades_institucionales",
+        "select=id,centro_id,usuario_id,tipo_autoridad," +
+        "cargo,documento_designacion,activo," +
+        "habilitado_desde,habilitado_hasta,revocado_en" +
+        "&order=creado_en.desc&limit=500"
+      );
+
+      render();
 
     } catch (error) {
       notice(
-        "No se pudieron consultar las autoridades: " +
+        "No se pudieron consultar las habilitaciones: " +
         error.message
       );
     }
   }
 
-  showLogin();
-
+  login();
 })();
