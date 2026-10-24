@@ -1,39 +1,49 @@
 
 /*
- * APP ALERTA SALUD V1.10.11
- * Web Push - Configuración integrada y compacta
+ * APP ALERTA SALUD V1.10.13
+ * Configuración Web Push integrada
  *
  * Archivo: push.js
  * Acción: REEMPLAZAR COMPLETO
  *
- * Corrección:
- * - Dos controles en la misma fila.
- * - Configuración desplegable a ancho completo.
- * - Sin tarjetas ni módulos adicionales.
- * - TEST_MODE activo: sin registros reales.
+ * Tres pestañas:
+ * - Avisos vigentes
+ * - Historial
+ * - Configurar avisos
+ *
+ * Sin módulos ni tarjetas adicionales.
+ * TEST_MODE: no registra dispositivos.
  */
 
 (() => {
   "use strict";
 
   const CONFIG = window.ALERTA_PUSH || {};
+
   const PUBLIC_KEY = CONFIG.publicKey || "";
+
   const API = String(
     CONFIG.subscriptionEndpoint || ""
   ).replace(/\/+$/, "");
 
   const TEST_MODE = true;
-  const STORAGE_KEY = "alerta_salud_push_device_v1";
+
+  const STORAGE_KEY =
+    "alerta_salud_push_device_v1";
 
   const state = {
     registration: null,
     subscription: null,
-    busy: false,
     centers: [],
-    selected: new Set()
+    selected: new Set(),
+    initialized: false,
+    loading: false,
+    mode: "vigentes"
   };
 
-  function element(tag, text, className) {
+  const $ = id => document.getElementById(id);
+
+  function create(tag, text, className) {
     const node = document.createElement(tag);
 
     if (text !== undefined) {
@@ -71,26 +81,12 @@
     }
   }
 
-  function decodeKey(value) {
-    const padding = "=".repeat(
-      (4 - value.length % 4) % 4
-    );
-
-    const binary = atob(
-      value.replace(/-/g, "+")
-        .replace(/_/g, "/") +
-      padding
-    );
-
-    return Uint8Array.from(
-      binary,
-      char => char.charCodeAt(0)
-    );
-  }
-
   function readCredentials() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(
+        STORAGE_KEY
+      );
+
       if (!raw) return null;
 
       const data = JSON.parse(raw);
@@ -106,20 +102,6 @@
     } catch {
       return null;
     }
-  }
-
-  function saveCredentials(data) {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        subscriptionId: data.subscriptionId,
-        token: data.token
-      })
-    );
-  }
-
-  function clearCredentials() {
-    localStorage.removeItem(STORAGE_KEY);
   }
 
   async function registration() {
@@ -146,46 +128,48 @@
     return state.subscription;
   }
 
-  async function request(path, data) {
+  async function request(path, body) {
+    if (!configured()) {
+      throw new Error(
+        "El servicio de notificaciones no está configurado."
+      );
+    }
+
     const response = await fetch(
-      `${API}${path}`,
+      API + path,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(body),
         credentials: "omit",
         cache: "no-store"
       }
     );
 
-    let result = {};
-
-    try {
-      result = await response.json();
-    } catch {
-      // Conservamos el estado HTTP.
-    }
+    const result = await response.json()
+      .catch(() => ({}));
 
     if (!response.ok) {
-      const error = new Error(
+      throw new Error(
         result.error ||
         "No se pudo completar la operación."
       );
-
-      error.status = response.status;
-      error.code = result.code;
-
-      throw error;
     }
 
     return result;
   }
 
   async function loadCenters() {
+    if (!configured()) {
+      throw new Error(
+        "El servicio está en preparación."
+      );
+    }
+
     const response = await fetch(
-      `${API}/centers`,
+      API + "/centers",
       {
         credentials: "omit",
         cache: "no-store"
@@ -194,13 +178,15 @@
 
     if (!response.ok) {
       throw new Error(
-        "No se pudo cargar el directorio."
+        "No se pudo consultar el directorio."
       );
     }
 
     const result = await response.json();
 
-    state.centers = Array.isArray(result.centers)
+    state.centers = Array.isArray(
+      result.centers
+    )
       ? result.centers
       : [];
 
@@ -212,118 +198,34 @@
 
     if (!credentials) return null;
 
-    return request("/subscription", credentials);
+    return request(
+      "/subscription",
+      credentials
+    );
   }
 
   async function savePreferences(centerIds) {
+    if (TEST_MODE) {
+      throw new Error(
+        "El guardado estará disponible al finalizar las pruebas."
+      );
+    }
+
     const credentials = readCredentials();
 
     if (!credentials) {
       throw new Error(
-        "El dispositivo no está registrado."
+        "Este dispositivo no está registrado."
       );
     }
 
-    return request("/preferences", {
-      ...credentials,
-      centerIds
-    });
-  }
-
-  async function subscribe() {
-    if (TEST_MODE) {
-      throw new Error(
-        "El registro continúa en preparación."
-      );
-    }
-
-    if (!configured()) {
-      throw new Error(
-        "El servicio push no está configurado."
-      );
-    }
-
-    const reg = await registration();
-
-    let subscription =
-      await reg.pushManager.getSubscription();
-
-    const credentials = readCredentials();
-
-    if (subscription && credentials) {
-      const server = await getServerSubscription();
-
-      if (server?.active) {
-        state.subscription = subscription;
-        return subscription;
+    return request(
+      "/preferences",
+      {
+        ...credentials,
+        centerIds
       }
-    }
-
-    if (subscription && !credentials) {
-      throw new Error(
-        "Existe una suscripción anterior sin credencial."
-      );
-    }
-
-    if (!subscription) {
-      const permission =
-        await Notification.requestPermission();
-
-      if (permission !== "granted") {
-        throw new Error(
-          "No se otorgó permiso para recibir avisos."
-        );
-      }
-
-      subscription = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: decodeKey(PUBLIC_KEY)
-      });
-    }
-
-    try {
-      const result = await request("/subscribe", {
-        subscription: subscription.toJSON()
-      });
-
-      saveCredentials(result);
-      state.subscription = subscription;
-
-      return subscription;
-    } catch (error) {
-      if (error.status !== 409) {
-        await subscription.unsubscribe()
-          .catch(() => {});
-      }
-
-      throw error;
-    }
-  }
-
-  async function unsubscribe() {
-    if (TEST_MODE) {
-      throw new Error(
-        "La gestión de dispositivos está en preparación."
-      );
-    }
-
-    const subscription = await refresh();
-    const credentials = readCredentials();
-
-    if (credentials) {
-      await request("/unsubscribe", credentials);
-      clearCredentials();
-    } else if (subscription) {
-      throw new Error(
-        "No se puede cancelar el registro remoto sin credencial."
-      );
-    }
-
-    if (subscription) {
-      await subscription.unsubscribe();
-    }
-
-    state.subscription = null;
+    );
   }
 
   function mount() {
@@ -331,195 +233,259 @@
       ".as-notifications"
     );
 
-    const actions = parent?.querySelector(
-      ".as-notification-actions"
+    const tabs = parent?.querySelector(
+      ".as-notification-tabs"
     );
+
+    const current = $("asNotCurrent");
+    const history = $("asNotHistory");
 
     if (
       !parent ||
-      !actions ||
-      document.getElementById("asPushPreferences")
+      !tabs ||
+      !current ||
+      !history ||
+      $("asPushPreferences")
     ) {
       return;
     }
 
-    const reloadButton = actions.querySelector(
-      "#asNotReload"
-    );
-
-    if (!reloadButton) return;
-
     /*
-     * Estructura:
-     *
-     * .as-notification-actions
-     *   ├─ #asNotReload
-     *   ├─ #asPushToggle
-     *   └─ #asPushPreferences (fila completa)
-     *
-     * No se usa display:contents ni details.
+     * TERCERA PESTAÑA
      */
 
-    actions.style.display = "grid";
-    actions.style.gridTemplateColumns =
-      "minmax(0,1fr) minmax(0,1fr)";
-    actions.style.columnGap = "8px";
-    actions.style.rowGap = "0";
-    actions.style.alignItems = "start";
-
-    reloadButton.style.width = "100%";
-    reloadButton.style.minWidth = "0";
-    reloadButton.style.minHeight = "38px";
-    reloadButton.style.margin = "0";
-    reloadButton.style.padding = "8px 5px";
-    reloadButton.style.fontSize = "11px";
-
-    const toggleButton = element(
+    const settingsTab = create(
       "button",
-      "🔔 Configurar avisos"
+      "⚙ Configurar",
+      "as-notification-tab"
     );
 
-    toggleButton.id = "asPushToggle";
-    toggleButton.type = "button";
-    toggleButton.className = "secondary";
+    settingsTab.type = "button";
+    settingsTab.id = "asNotSettings";
 
-    toggleButton.style.cssText = [
-      "width:100%",
-      "min-width:0",
-      "min-height:38px",
-      "margin:0",
-      "padding:8px 5px",
-      "font-size:11px",
-      "text-align:center"
-    ].join(";");
-
-    toggleButton.setAttribute(
-      "aria-expanded",
-      "false"
-    );
-
-    toggleButton.setAttribute(
+    settingsTab.setAttribute(
       "aria-controls",
       "asPushPreferences"
     );
 
-    const content = element("div");
-    content.id = "asPushPreferences";
-    content.hidden = true;
+    tabs.append(settingsTab);
 
-    content.style.cssText = [
-      "grid-column:1 / -1",
+    tabs.style.gridTemplateColumns =
+      "repeat(3,minmax(0,1fr))";
+
+    tabs.style.gap = "5px";
+
+    for (const button of [
+      current,
+      history,
+      settingsTab
+    ]) {
+      button.style.minWidth = "0";
+      button.style.padding = "10px 3px";
+      button.style.fontSize = "11px";
+      button.style.whiteSpace = "normal";
+      button.style.lineHeight = "1.25";
+    }
+
+    /*
+     * CONTENIDO DE CONFIGURACIÓN
+     *
+     * Se utiliza el mismo espacio
+     * de los avisos y el historial.
+     */
+
+    const panel = create("div");
+    panel.id = "asPushPreferences";
+    panel.hidden = true;
+    panel.style.display = "none";
+
+    panel.style.cssText = [
+      "display:none",
       "width:100%",
       "min-width:0",
       "box-sizing:border-box",
-      "padding:10px 0 2px",
-      "font-size:12px"
+      "padding:3px 0 10px"
     ].join(";");
 
-    const description = element(
-      "p",
-      "Elegí los establecimientos de los " +
-      "que deseás recibir avisos oficiales."
+    const title = create(
+      "h3",
+      "Notificaciones en mi dispositivo"
     );
 
-    description.style.margin = "0 0 8px";
+    title.style.cssText = [
+      "font-size:14px",
+      "margin:4px 0 7px"
+    ].join(";");
 
-    const status = element("p");
+    const description = create(
+      "p",
+      "Seleccioná los establecimientos de los " +
+      "que querés recibir avisos oficiales."
+    );
+
+    description.style.cssText = [
+      "font-size:12px",
+      "line-height:1.5",
+      "margin:0 0 10px"
+    ].join(";");
+
+    const status = create("p");
+
     status.setAttribute("role", "status");
-    status.setAttribute("aria-live", "polite");
+    status.setAttribute(
+      "aria-live",
+      "polite"
+    );
 
     status.style.cssText = [
       "font-size:12px",
-      "margin:8px 0",
-      "color:#526477"
+      "color:#526477",
+      "margin:8px 0"
     ].join(";");
 
-    const centersContainer = element("div");
+    const centersContainer = create("div");
 
     centersContainer.style.cssText = [
       "display:grid",
-      "gap:6px",
+      "gap:7px",
       "margin:10px 0"
     ].join(";");
 
-    const activateButton = element(
-      "button",
-      "Activar notificaciones"
-    );
-
-    activateButton.type = "button";
-    activateButton.className = "secondary";
-
-    const saveButton = element(
-      "button",
-      "Guardar selección"
-    );
-
-    saveButton.type = "button";
-    saveButton.className = "secondary";
-
-    const buttons = element("div");
+    const buttons = create("div");
 
     buttons.style.cssText = [
       "display:flex",
-      "flex-wrap:wrap",
       "gap:8px",
-      "margin-top:10px"
+      "flex-wrap:wrap",
+      "margin-top:12px"
     ].join(";");
+
+    const activateButton = create(
+      "button",
+      "Activar notificaciones",
+      "secondary"
+    );
+
+    activateButton.type = "button";
+    activateButton.disabled = true;
+
+    const saveButton = create(
+      "button",
+      "Guardar selección",
+      "secondary"
+    );
+
+    saveButton.type = "button";
+    saveButton.disabled = true;
 
     buttons.append(
       activateButton,
       saveButton
     );
 
-    content.append(
+    panel.append(
+      title,
       description,
       status,
       centersContainer,
       buttons
     );
 
-    actions.append(toggleButton, content);
-
     /*
-     * La configuración empieza cerrada.
-     * El atributo hidden mantiene la segunda
-     * fila fuera de la distribución.
+     * Insertar debajo de las pestañas,
+     * dentro del Centro existente.
      */
 
-    let opened = false;
-    let initialized = false;
-    let initializing = false;
+    tabs.insertAdjacentElement(
+      "afterend",
+      panel
+    );
 
-    function syncVisibility() {
-      content.hidden = !opened;
+    /*
+     * Elementos existentes:
+     * se ocultan solamente cuando
+     * se abre Configurar.
+     */
 
-      toggleButton.setAttribute(
-        "aria-expanded",
-        String(opened)
+    const regularContent = [
+      parent.querySelector(
+        ".as-notification-filters"
+      ),
+      parent.querySelector(
+        ".as-notification-actions"
+      ),
+      $("asNotStatus"),
+      $("asNotList"),
+      parent.querySelector(
+        ".as-notification-disclaimer"
+      )
+    ].filter(Boolean);
+
+    /*
+     * Por seguridad, no modificamos
+     * la lógica de consulta de avisos.
+     */
+
+    function showRegularContent(show) {
+      for (const node of regularContent) {
+        node.hidden = !show;
+
+        if (show) {
+          node.style.removeProperty(
+            "display"
+          );
+        } else {
+          node.style.setProperty(
+            "display",
+            "none"
+          );
+        }
+      }
+    }
+
+    function setMode(mode) {
+      state.mode = mode;
+
+      const isSettings =
+        mode === "configurar";
+
+      panel.hidden = !isSettings;
+      panel.style.display =
+        isSettings ? "block" : "none";
+
+      showRegularContent(!isSettings);
+
+      settingsTab.classList.toggle(
+        "selected",
+        isSettings
       );
 
-      toggleButton.textContent = opened
-        ? "🔔 Ocultar configuración"
-        : "🔔 Configurar avisos";
+      if (isSettings) {
+        current.classList.remove(
+          "selected"
+        );
+
+        history.classList.remove(
+          "selected"
+        );
+      }
+
+      settingsTab.setAttribute(
+        "aria-pressed",
+        String(isSettings)
+      );
     }
 
-    function setBusy(value) {
-      state.busy = value;
-
-      activateButton.disabled =
-        value || TEST_MODE;
-
-      saveButton.disabled =
-        value || TEST_MODE;
-    }
+    /*
+     * RENDERIZAR ESTABLECIMIENTOS
+     */
 
     function renderCenters() {
       centersContainer.replaceChildren();
 
       if (!state.centers.length) {
         centersContainer.append(
-          element(
+          create(
             "p",
             "No hay establecimientos disponibles."
           )
@@ -528,114 +494,198 @@
       }
 
       for (const center of state.centers) {
-        const label = element("label");
+        const label = create("label");
 
         label.style.cssText = [
           "display:flex",
           "align-items:center",
-          "gap:8px",
-          "padding:9px 10px",
-          "border:1px solid #e2e8f0",
-          "border-radius:7px",
-          "font-size:12px",
-          "cursor:pointer",
+          "gap:9px",
+          "padding:10px",
+          "border:1px solid #dbe4ec",
+          "border-radius:8px",
           "width:100%",
-          "box-sizing:border-box"
+          "box-sizing:border-box",
+          "font-size:12px",
+          "cursor:pointer"
         ].join(";");
 
-        const checkbox = element("input");
-        checkbox.type = "checkbox";
-        checkbox.value = String(center.id);
+        const checkbox = create("input");
 
-        checkbox.checked = state.selected.has(
-          Number(center.id)
+        checkbox.type = "checkbox";
+        checkbox.value = String(
+          center.id
         );
 
-        checkbox.addEventListener("change", () => {
-          const id = Number(center.id);
+        checkbox.checked =
+          state.selected.has(
+            Number(center.id)
+          );
 
-          if (checkbox.checked) {
-            state.selected.add(id);
-          } else {
-            state.selected.delete(id);
+        checkbox.addEventListener(
+          "change",
+          () => {
+            const id = Number(
+              center.id
+            );
+
+            if (checkbox.checked) {
+              state.selected.add(id);
+            } else {
+              state.selected.delete(id);
+            }
           }
-        });
+        );
 
-        const name = element(
+        const name = create(
           "span",
           center.nombre
         );
 
         name.style.minWidth = "0";
-        name.style.overflowWrap = "anywhere";
+        name.style.overflowWrap =
+          "anywhere";
 
-        label.append(checkbox, name);
+        label.append(
+          checkbox,
+          name
+        );
+
         centersContainer.append(label);
       }
     }
 
-    async function update() {
-      const subscription = await refresh();
-      const credentials = readCredentials();
+    /*
+     * ABRIR CONFIGURACIÓN
+     */
 
-      if (subscription && credentials) {
-        const server = await getServerSubscription();
+    settingsTab.addEventListener(
+      "click",
+      async () => {
+        setMode("configurar");
 
-        if (server?.active) {
-          state.selected = new Set(
-            server.centerIds || []
-          );
+        if (
+          state.initialized ||
+          state.loading
+        ) {
+          return;
+        }
+
+        state.loading = true;
+
+        status.textContent =
+          "Consultando establecimientos...";
+
+        try {
+          await loadCenters();
 
           renderCenters();
 
-          activateButton.textContent =
-            "Desactivar notificaciones";
+          if (!supported()) {
+            status.textContent =
+              "Este navegador no admite notificaciones Web Push.";
+            buttons.hidden = true;
+          } else if (TEST_MODE) {
+            status.textContent =
+              "La activación está en preparación. " +
+              "Podés consultar los establecimientos disponibles.";
+          } else {
+            const server =
+              await getServerSubscription();
 
+            if (server?.active) {
+              state.selected = new Set(
+                server.centerIds || []
+              );
+
+              renderCenters();
+            }
+          }
+
+          state.initialized = true;
+
+        } catch (error) {
           status.textContent =
-            "Dispositivo registrado.";
-
-          return;
+            error.message;
+        } finally {
+          state.loading = false;
         }
       }
+    );
 
-      activateButton.textContent =
-        "Activar notificaciones";
+    /*
+     * VOLVER A AVISOS O HISTORIAL
+     *
+     * Sus eventos originales siguen
+     * funcionando en notificaciones.js.
+     */
 
-      status.textContent =
-        "Notificaciones desactivadas.";
-    }
+    current.addEventListener(
+      "click",
+      () => setMode("vigentes")
+    );
+
+    history.addEventListener(
+      "click",
+      () => setMode("historial")
+    );
+
+    /*
+     * Cuando otra parte de la aplicación
+     * selecciona una pestaña original,
+     * sincronizamos la vista.
+     *
+     * Esto incluye los accesos del menú
+     * Más > Notificaciones / Historial.
+     */
+
+    const observer = new MutationObserver(
+      () => {
+        if (
+          current.classList.contains(
+            "selected"
+          ) &&
+          state.mode === "configurar"
+        ) {
+          setMode("vigentes");
+        } else if (
+          history.classList.contains(
+            "selected"
+          ) &&
+          state.mode === "configurar"
+        ) {
+          setMode("historial");
+        }
+      }
+    );
+
+    observer.observe(current, {
+      attributes: true,
+      attributeFilter: ["class"]
+    });
+
+    observer.observe(history, {
+      attributes: true,
+      attributeFilter: ["class"]
+    });
+
+    /*
+     * MODO DE PRUEBA
+     *
+     * No se ejecutan altas, bajas
+     * ni modificaciones de suscripciones.
+     */
 
     activateButton.addEventListener(
       "click",
-      async () => {
-        if (state.busy || TEST_MODE) return;
-
-        setBusy(true);
-
-        try {
-          const current = await refresh();
-
-          if (current) {
-            await unsubscribe();
-          } else {
-            await subscribe();
-          }
-
-          await update();
-        } catch (error) {
-          status.textContent = error.message;
-        } finally {
-          setBusy(false);
-        }
+      () => {
+        if (TEST_MODE) return;
       }
     );
 
     saveButton.addEventListener(
       "click",
       async () => {
-        if (state.busy || TEST_MODE) return;
-
-        setBusy(true);
+        if (TEST_MODE) return;
 
         try {
           await savePreferences(
@@ -643,67 +693,15 @@
           );
 
           status.textContent =
-            "Selección guardada.";
+            "Preferencias guardadas.";
         } catch (error) {
-          status.textContent = error.message;
-        } finally {
-          setBusy(false);
+          status.textContent =
+            error.message;
         }
       }
     );
 
-    toggleButton.addEventListener(
-      "click",
-      async () => {
-        opened = !opened;
-        syncVisibility();
-
-        if (
-          !opened ||
-          initialized ||
-          initializing
-        ) {
-          return;
-        }
-
-        initializing = true;
-        setBusy(true);
-
-        try {
-          if (!configured()) {
-            throw new Error(
-              "El servicio push está en preparación."
-            );
-          }
-
-          await loadCenters();
-          renderCenters();
-
-          if (!supported()) {
-            status.textContent =
-              "Este navegador no admite Web Push.";
-            buttons.hidden = true;
-          } else if (TEST_MODE) {
-            status.textContent =
-              "Vista previa: la activación estará " +
-              "disponible después de las pruebas.";
-          } else {
-            await update();
-          }
-
-          initialized = true;
-        } catch (error) {
-          status.textContent = error.message;
-          buttons.hidden = true;
-        } finally {
-          initializing = false;
-          setBusy(false);
-        }
-      }
-    );
-
-    syncVisibility();
-    setBusy(false);
+    setMode("vigentes");
   }
 
   mount();
@@ -712,6 +710,7 @@
     supported,
     configured,
     refresh,
-    loadCenters
+    loadCenters,
+    getServerSubscription
   });
 })();
