@@ -1,11 +1,16 @@
 
 /*
- * APP ALERTA SALUD V1.9.8
- * Directorio sanitario y novedades institucionales.
+ * APP ALERTA SALUD V1.9.9
+ * DIRECTORIO SANITARIO Y NOVEDADES INSTITUCIONALES
  *
- * Conserva los datos asistenciales existentes.
- * Agrega novedades oficiales vigentes e historial
- * por establecimiento, sin publicar ni modificar datos.
+ * - Estados operativos verificados
+ * - Vigencia de declaraciones
+ * - Novedades oficiales por establecimiento
+ * - Historial de comunicaciones
+ * - Horarios de Argentina en formato 24 horas
+ * - Mapa y enlaces de ubicación
+ *
+ * No realiza publicaciones ni modifica Supabase.
  */
 
 (() => {
@@ -17,6 +22,8 @@
   let rowsCache = [];
   let notificationsCache = [];
   let notificationsAvailable = true;
+
+  const TIME_ZONE = "America/Argentina/Buenos_Aires";
 
   const names = {
     operativo: "Operativo",
@@ -52,12 +59,16 @@
     otro: "📢"
   };
 
+  // =========================================
+  // ESTILOS
+  // =========================================
+
   const style = document.createElement("style");
 
   style.textContent = `
     .as-care-notices {
       margin-top: 16px;
-      padding-top: 12px;
+      padding-top: 14px;
       border-top: 1px solid #d5e0e9;
     }
 
@@ -68,10 +79,10 @@
 
     .as-care-notice {
       margin: 10px 0;
-      padding: 12px;
+      padding: 13px;
       border: 1px solid #d5e0e9;
       border-left: 4px solid #b45309;
-      border-radius: 9px;
+      border-radius: 10px;
       background: #fffaf0;
       overflow-wrap: anywhere;
     }
@@ -82,32 +93,51 @@
     }
 
     .as-care-notice h5 {
-      margin: 8px 0;
+      margin: 9px 0;
       font-size: 1rem;
+      line-height: 1.4;
     }
 
     .as-care-notice p {
-      margin: 7px 0;
+      margin: 8px 0;
       line-height: 1.5;
       white-space: pre-wrap;
     }
 
-    .as-care-notice small {
+    .as-care-notice strong {
+      font-weight: 700;
+    }
+
+    .as-care-notice-type {
       display: block;
-      margin-top: 8px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .as-care-notice-dates {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid #e0e6eb;
+    }
+
+    .as-care-notice-dates p {
+      margin: 5px 0;
+      font-size: .88rem;
       color: #526577;
+      line-height: 1.5;
     }
 
     .as-care-history {
       margin-top: 12px;
       border: 1px solid #d5e0e9;
       border-radius: 9px;
-      padding: 10px;
+      padding: 11px;
     }
 
     .as-care-history summary {
       cursor: pointer;
       font-weight: 600;
+      line-height: 1.5;
     }
 
     .as-care-history .as-care-notice {
@@ -118,21 +148,47 @@
     .as-care-muted {
       color: #526577;
       font-size: .9rem;
+      line-height: 1.5;
     }
 
     .as-care-warning {
       margin: 10px 0;
       color: #854d0e;
       font-size: .9rem;
+      line-height: 1.5;
+    }
+
+    .as-care-expired {
+      margin: 10px 0;
+      padding: 11px;
+      border-left: 4px solid #b45309;
+      border-radius: 7px;
+      background: #fff7e8;
+      line-height: 1.5;
+    }
+
+    .as-care-current {
+      margin: 10px 0;
+      padding: 10px;
+      border-left: 4px solid #15803d;
+      border-radius: 7px;
+      background: #f0fdf4;
+      line-height: 1.5;
     }
   `;
 
   document.head.append(style);
 
+  // =========================================
+  // UTILIDADES
+  // =========================================
+
   function node(tag, className, text) {
     const element = document.createElement(tag);
 
-    if (className) element.className = className;
+    if (className) {
+      element.className = className;
+    }
 
     if (text !== undefined && text !== null) {
       element.textContent = String(text);
@@ -146,20 +202,46 @@
 
     paragraph.append(
       node("strong", null, label + ": "),
-      document.createTextNode(text)
+      document.createTextNode(
+        String(text ?? "No informado")
+      )
     );
 
     card.append(paragraph);
+
+    return paragraph;
   }
 
   function dateText(value) {
-    if (!value) return "No informada";
+    if (!value) {
+      return "No informada";
+    }
 
     const date = new Date(value);
 
-    return Number.isNaN(date.getTime())
-      ? "No informada"
-      : date.toLocaleString("es-AR");
+    if (Number.isNaN(date.getTime())) {
+      return "Fecha no disponible";
+    }
+
+    return new Intl.DateTimeFormat("es-AR", {
+      timeZone: TIME_ZONE,
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23"
+    }).format(date);
+  }
+
+  function dateMillis(value) {
+    if (!value) return null;
+
+    const milliseconds = Date.parse(value);
+
+    return Number.isFinite(milliseconds)
+      ? milliseconds
+      : null;
   }
 
   function getRawState(row) {
@@ -175,25 +257,24 @@
       return false;
     }
 
-    if (!state.verificado_hasta) {
-      return false;
-    }
-
-    const expiration = Date.parse(
+    const expiration = dateMillis(
       state.verificado_hasta
     );
 
-    return Number.isFinite(expiration) &&
+    return expiration !== null &&
       expiration > Date.now();
   }
 
   function state(row) {
     const raw = getRawState(row);
+
     return valid(raw) ? raw : null;
   }
 
   function value(current, key) {
-    if (!current) return "Sin verificar";
+    if (!current) {
+      return "Sin verificar";
+    }
 
     const code = current[key];
 
@@ -206,22 +287,20 @@
   }
 
   function freshness(raw) {
-    if (!raw) return "Sin declaración verificada";
+    if (!raw) {
+      return "Sin declaración verificada";
+    }
 
-    if (!raw.validado) {
+    if (raw.validado !== true) {
       return "Información no validada";
     }
 
-    if (!raw.verificado_hasta) {
-      return "Sin vigencia confirmada";
-    }
-
-    const expiration = Date.parse(
+    const expiration = dateMillis(
       raw.verificado_hasta
     );
 
-    if (!Number.isFinite(expiration)) {
-      return "Vigencia no disponible";
+    if (expiration === null) {
+      return "Sin vigencia confirmada";
     }
 
     return expiration <= Date.now()
@@ -229,27 +308,43 @@
       : "Información vigente";
   }
 
+  // =========================================
+  // VIGENCIA DE NOVEDADES
+  // =========================================
+
   function isCurrent(item) {
     const now = Date.now();
-    const start = Date.parse(item.vigente_desde);
 
-    if (!Number.isFinite(start) || start > now) {
+    const start = dateMillis(
+      item.vigente_desde
+    );
+
+    if (start === null || start > now) {
       return false;
     }
 
-    if (!item.vigente_hasta) return true;
+    if (!item.vigente_hasta) {
+      return true;
+    }
 
-    const end = Date.parse(item.vigente_hasta);
+    const end = dateMillis(
+      item.vigente_hasta
+    );
 
-    return Number.isFinite(end) && end > now;
+    return end !== null && end > now;
   }
 
   function noticesForCenter(centerId) {
     return notificationsCache.filter(
-      item => String(item.centro_id) ===
+      item =>
+        String(item.centro_id) ===
         String(centerId)
     );
   }
+
+  // =========================================
+  // TARJETAS DE NOTIFICACIONES
+  // =========================================
 
   function noticeCard(item, historical = false) {
     const article = node(
@@ -263,17 +358,22 @@
       )
     );
 
-    const type = noticeTypes[item.tipo_cambio] ||
+    const type =
+      noticeTypes[item.tipo_cambio] ||
       "Comunicación institucional";
 
     article.append(
       node(
-        "strong",
-        null,
+        "span",
+        "as-care-notice-type",
         (noticeIcons[item.tipo_cambio] || "📢") +
         " " + type
       ),
-      node("h5", null, item.titulo)
+      node(
+        "h5",
+        null,
+        item.titulo || "Comunicación sin título"
+      )
     );
 
     if (item.servicio_afectado) {
@@ -301,39 +401,59 @@
     const status = historical
       ? (
           isCurrent(item)
-            ? "Vigente, reemplazada por otra comunicación"
+            ? "Reemplazada por otra comunicación"
             : (
-                Date.parse(item.vigente_desde) >
-                Date.now()
+                (
+                  dateMillis(item.vigente_desde) ??
+                  0
+                ) > Date.now()
                   ? "Programada"
                   : "Fuera de vigencia"
               )
         )
       : "Vigente";
 
-    article.append(
-      node(
-        "small",
-        null,
-        "Estado: " + status +
-        " · Publicado: " +
-        dateText(item.publicado_en)
-      )
+    const dates = node(
+      "div",
+      "as-care-notice-dates"
+    );
+
+    line(dates, "Estado", status);
+
+    line(
+      dates,
+      "Publicado",
+      dateText(item.publicado_en)
+    );
+
+    line(
+      dates,
+      "Desde",
+      dateText(item.vigente_desde)
     );
 
     if (item.vigente_hasta) {
-      article.append(
-        node(
-          "small",
-          null,
-          "Vigente hasta: " +
-          dateText(item.vigente_hasta)
-        )
+      line(
+        dates,
+        "Hasta",
+        dateText(item.vigente_hasta)
+      );
+    } else {
+      line(
+        dates,
+        "Hasta",
+        "Sin fecha de finalización informada"
       );
     }
 
+    article.append(dates);
+
     return article;
   }
+
+  // =========================================
+  // NOVEDADES POR ESTABLECIMIENTO
+  // =========================================
 
   function appendNotices(card, centerId) {
     const section = node(
@@ -366,16 +486,18 @@
 
     const all = noticesForCenter(centerId);
 
-    // Una comunicación posterior vinculada a otra
-    // la reemplaza en la vista principal.
+    // Una comunicación posterior vinculada
+    // reemplaza la anterior en la vista principal.
     const replacedIds = new Set(
       all
-        .filter(item =>
-          item.notificacion_anterior_id &&
-          isCurrent(item)
+        .filter(
+          item =>
+            item.notificacion_anterior_id &&
+            isCurrent(item)
         )
-        .map(item =>
-          String(item.notificacion_anterior_id)
+        .map(
+          item =>
+            String(item.notificacion_anterior_id)
         )
     );
 
@@ -394,8 +516,8 @@
         node(
           "p",
           "as-care-muted",
-          "No hay novedades institucionales " +
-          "vigentes registradas para este establecimiento. " +
+          "No hay novedades institucionales vigentes " +
+          "registradas para este establecimiento. " +
           "Esto no garantiza ausencia de afectaciones."
         )
       );
@@ -412,7 +534,9 @@
       );
 
       for (const item of current) {
-        section.append(noticeCard(item));
+        section.append(
+          noticeCard(item)
+        );
       }
     }
 
@@ -443,6 +567,10 @@
     card.append(section);
   }
 
+  // =========================================
+  // FICHA DEL ESTABLECIMIENTO
+  // =========================================
+
   function render() {
     const list = $("careList");
     const summary = $("careSummary");
@@ -453,6 +581,7 @@
     list.replaceChildren();
 
     const selection = filter?.value || "todos";
+
     let found = 0;
 
     for (const row of rowsCache) {
@@ -471,10 +600,17 @@
 
       found++;
 
-      const card = node("article", "care-item");
+      const card = node(
+        "article",
+        "care-item"
+      );
 
       card.append(
-        node("h3", null, "🏥 " + row.nombre),
+        node(
+          "h3",
+          null,
+          "🏥 " + row.nombre
+        ),
         node(
           "span",
           "care-tag care-" + operation,
@@ -535,24 +671,58 @@
           "Vigente hasta",
           dateText(current.verificado_hasta)
         );
+
+        card.append(
+          node(
+            "div",
+            "as-care-current",
+            "El estado operativo corresponde a " +
+            "una declaración institucional vigente."
+          )
+        );
+
       } else {
+        if (raw?.verificado_hasta) {
+          line(
+            card,
+            "Última vigencia informada",
+            dateText(raw.verificado_hasta)
+          );
+        }
+
         line(
           card,
           "Disponibilidad asistencial",
           "No confirmada actualmente"
         );
+
+        card.append(
+          node(
+            "div",
+            "as-care-expired",
+            "⚠️ El estado operativo no cuenta " +
+            "con una verificación vigente. " +
+            "Esto no significa que el " +
+            "establecimiento esté cerrado."
+          )
+        );
       }
 
-      // Novedades propias de este establecimiento.
+      // Novedades institucionales del centro.
       appendNotices(card, row.id);
 
-      // Enlace geográfico original.
+      // =====================================
+      // UBICACIÓN EN OPENSTREETMAP
+      // =====================================
+
       const lat = Number(row.latitud);
       const lon = Number(row.longitud);
 
       if (
         row.latitud !== null &&
+        row.latitud !== undefined &&
         row.longitud !== null &&
+        row.longitud !== undefined &&
         Number.isFinite(lat) &&
         Number.isFinite(lon) &&
         Math.abs(lat) <= 90 &&
@@ -598,6 +768,10 @@
     }
   }
 
+  // =========================================
+  // CONSULTAS A SUPABASE
+  // =========================================
+
   async function load() {
     const api = window.AlertaSalud;
     const status = $("careStatus");
@@ -615,7 +789,10 @@
     list.replaceChildren();
 
     const summary = $("careSummary");
-    if (summary) summary.textContent = "";
+
+    if (summary) {
+      summary.textContent = "";
+    }
 
     status.textContent =
       "Consultando establecimientos de " +
@@ -641,10 +818,10 @@
 
       if (requestId !== serial) return;
 
-      rowsCache = Array.isArray(rows) ? rows : [];
+      rowsCache = Array.isArray(rows)
+        ? rows
+        : [];
 
-      // Consultar novedades solo para los centros
-      // que efectivamente aparecen en el directorio.
       if (rowsCache.length) {
         try {
           const ids = rowsCache
@@ -673,18 +850,20 @@
               "limit=500"
             ].join("&");
 
-            const notifications = await api.fetchPublic(
-              "as_notificaciones",
-              noticeQuery
-            );
+            const notifications =
+              await api.fetchPublic(
+                "as_notificaciones",
+                noticeQuery
+              );
 
             if (requestId !== serial) return;
 
-            notificationsCache = Array.isArray(
-              notifications
-            ) ? notifications : [];
-
+            notificationsCache =
+              Array.isArray(notifications)
+                ? notifications
+                : [];
           }
+
         } catch (error) {
           if (requestId !== serial) return;
 
@@ -723,6 +902,10 @@
       );
     }
   }
+
+  // =========================================
+  // EVENTOS
+  // =========================================
 
   $("careFilter")?.addEventListener(
     "change",
@@ -774,7 +957,7 @@
   }
 
   console.info(
-    "App Alerta Salud: directorio V1.9.8"
+    "App Alerta Salud: directorio V1.9.9"
   );
 
 })();
