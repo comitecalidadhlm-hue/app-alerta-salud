@@ -4,7 +4,7 @@
  * Service Worker
  */
 
-const CACHE = "alerta-salud-v1-9-6";
+const CACHE = "alerta-salud-v1-9-8";
 
 const ASSETS = [
   "./",
