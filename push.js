@@ -1,17 +1,19 @@
 
 /*
- * APP ALERTA SALUD V1.10.16
+ * APP ALERTA SALUD V1.10.17
  *
  * Archivo: push.js
  * Acción: REEMPLAZAR COMPLETO
  *
- * Corrección:
- * - Conserva selecciones pendientes.
- * - Evita perder preferencias al activar.
- * - Verifica el guardado en Supabase.
- * - Mantiene las tres pestañas.
+ * Recuperación segura de dispositivos:
+ * - Detecta suscripción local perdida.
+ * - Conserva preferencias de Supabase.
+ * - Reconecta con credenciales existentes.
+ * - Evita crear registros duplicados.
+ * - Mantiene tres pestañas compactas.
  *
- * No habilita envíos automáticos.
+ * Backend compatible: V1.10.14
+ * Envíos automáticos: deshabilitados.
  */
 
 (() => {
@@ -38,6 +40,7 @@
     loading: false,
     busy: false,
     registered: false,
+    needsReconnect: false,
     dirty: false,
     mode: "vigentes"
   };
@@ -194,12 +197,6 @@
   }
 
   async function loadCenters() {
-    if (!configured()) {
-      throw new Error(
-        "El servicio Web Push no está configurado."
-      );
-    }
-
     const response = await fetch(
       API + "/centers",
       {
@@ -246,9 +243,9 @@
 
     if (existing && !credentials) {
       throw new Error(
-        "El navegador conserva una suscripción " +
-        "sin credencial. No se modificó " +
-        "por seguridad."
+        "Existe una suscripción local sin " +
+        "credenciales de administración. " +
+        "No se modificó por seguridad."
       );
     }
 
@@ -256,13 +253,15 @@
     let createdLocally = false;
 
     if (!subscription) {
-      const permission =
-        await Notification.requestPermission();
+      if (Notification.permission !== "granted") {
+        const permission =
+          await Notification.requestPermission();
 
-      if (permission !== "granted") {
-        throw new Error(
-          "No se concedió permiso para recibir avisos."
-        );
+        if (permission !== "granted") {
+          throw new Error(
+            "No se concedió permiso para recibir avisos."
+          );
+        }
       }
 
       subscription =
@@ -298,17 +297,30 @@
         !result.token
       ) {
         throw new Error(
-          "El servidor no devolvió las credenciales."
+          "El servidor no confirmó las credenciales."
         );
       }
 
+      /*
+       * El backend devuelve las mismas
+       * credenciales al renovar.
+       */
       saveCredentials(result);
 
       state.registered = true;
+      state.needsReconnect = false;
 
       return result;
 
     } catch (error) {
+      /*
+       * No dejamos una nueva suscripción
+       * local si el servidor rechazó
+       * la renovación.
+       *
+       * Nunca eliminamos una suscripción
+       * local preexistente.
+       */
       if (createdLocally) {
         await subscription.unsubscribe()
           .catch(() => {});
@@ -353,6 +365,7 @@
     clearCredentials();
 
     state.registered = false;
+    state.needsReconnect = false;
     state.dirty = false;
     state.selected.clear();
 
@@ -418,7 +431,7 @@
     }
 
     /*
-     * PANEL INTEGRADO
+     * PANEL COMPACTO
      */
 
     const panel = create("div");
@@ -596,7 +609,7 @@
     }
 
     /*
-     * RENDERIZADO DE ESTABLECIMIENTOS
+     * ESTABLECIMIENTOS
      */
 
     function renderCenters() {
@@ -609,7 +622,6 @@
             "No hay establecimientos disponibles."
           )
         );
-
         return;
       }
 
@@ -652,11 +664,6 @@
               state.selected.delete(id);
             }
 
-            /*
-             * Marca cambios pendientes.
-             * No serán reemplazados por
-             * una consulta al servidor.
-             */
             state.dirty = true;
 
             status.textContent =
@@ -683,10 +690,11 @@
     }
 
     /*
-     * CONSULTA DEL ESTADO
+     * RECUPERACIÓN DEL ESTADO
      *
-     * preserveSelection evita sobrescribir
-     * los cambios realizados por el usuario.
+     * Las preferencias del servidor
+     * se cargan incluso cuando Chrome
+     * perdió su suscripción local.
      */
 
     async function updateStatus(
@@ -696,6 +704,7 @@
 
       if (!credentials) {
         state.registered = false;
+        state.needsReconnect = false;
 
         activateButton.textContent =
           "Activar notificaciones";
@@ -711,52 +720,64 @@
         const server =
           await getServerSubscription();
 
+        if (!server?.active) {
+          throw new Error(
+            "El servidor no reconoce la suscripción."
+          );
+        }
+
+        /*
+         * Recuperar preferencias sin
+         * borrar cambios pendientes.
+         */
+        if (
+          !preserveSelection ||
+          !state.dirty
+        ) {
+          state.selected = new Set(
+            (server.centerIds || [])
+              .map(Number)
+          );
+
+          state.dirty = false;
+
+          renderCenters();
+        }
+
         const local = await refresh();
 
-        if (server?.active && local) {
-          state.registered = true;
+        state.registered = true;
 
-          /*
-           * Solo cargar preferencias remotas
-           * si no hay cambios pendientes.
-           */
-          if (
-            !preserveSelection ||
-            !state.dirty
-          ) {
-            state.selected = new Set(
-              (server.centerIds || [])
-                .map(Number)
-            );
-
-            state.dirty = false;
-
-            renderCenters();
-          }
+        if (local) {
+          state.needsReconnect = false;
 
           activateButton.textContent =
             "Desactivar notificaciones";
 
           status.textContent =
             state.dirty
-              ? "Dispositivo registrado. " +
-                "Tenés cambios pendientes de guardar."
-              : "Dispositivo registrado. " +
+              ? "Tenés cambios pendientes de guardar."
+              : "Dispositivo conectado. " +
                 `${state.selected.size} establecimiento(s) ` +
-                "seleccionado(s). " +
-                "Los envíos siguen deshabilitados.";
-
+                "seleccionado(s).";
         } else {
-          state.registered = false;
-
-          status.textContent =
-            "La suscripción requiere revisión.";
+          state.needsReconnect = true;
 
           activateButton.textContent =
-            "Activar notificaciones";
+            "Reconectar dispositivo";
+
+          status.textContent =
+            "La selección está guardada, " +
+            "pero este navegador necesita " +
+            "reconectarse para recibir avisos.";
         }
+
       } catch (error) {
         state.registered = false;
+        state.needsReconnect = false;
+
+        activateButton.textContent =
+          "Activar notificaciones";
 
         status.textContent =
           "No se pudo verificar el registro: " +
@@ -767,7 +788,7 @@
     }
 
     /*
-     * CARGAR PESTAÑA CONFIGURAR
+     * ABRIR CONFIGURACIÓN
      */
 
     settingsTab.addEventListener(
@@ -815,7 +836,7 @@
     );
 
     /*
-     * PESTAÑAS EXISTENTES
+     * NAVEGACIÓN EXISTENTE
      */
 
     current.addEventListener(
@@ -859,7 +880,7 @@
     });
 
     /*
-     * ACTIVAR / DESACTIVAR
+     * ACTIVAR / RECONEXIÓN / BAJA
      */
 
     activateButton.addEventListener(
@@ -873,44 +894,33 @@
           return;
         }
 
-        const action = state.registered
-          ? "desactivar"
-          : "activar";
+        const action = state.needsReconnect
+          ? "reconectar"
+          : state.registered
+            ? "desactivar"
+            : "activar";
 
-        const message = action === "activar"
-          ? "¿Querés registrar este dispositivo " +
-            "para las pruebas de notificaciones? " +
-            "Todavía no se enviarán avisos."
-          : "¿Querés desactivar las notificaciones " +
-            "de este dispositivo?";
+        const messages = {
+          activar:
+            "¿Querés activar las notificaciones " +
+            "en este dispositivo?",
+          reconectar:
+            "¿Querés reconectar este navegador? " +
+            "Se conservarán los establecimientos " +
+            "que ya seleccionaste.",
+          desactivar:
+            "¿Querés desactivar las notificaciones " +
+            "de este dispositivo?"
+        };
 
-        if (!window.confirm(message)) return;
+        if (!window.confirm(messages[action])) {
+          return;
+        }
 
         setBusy(true);
 
         try {
-          if (action === "activar") {
-            await subscribe();
-
-            /*
-             * No consultamos el servidor
-             * antes de guardar la selección
-             * que hizo el usuario.
-             */
-            if (
-              state.dirty &&
-              state.selected.size > 0
-            ) {
-              await savePreferences(
-                [...state.selected]
-              );
-
-              state.dirty = false;
-            }
-
-            await updateStatus(true);
-
-          } else {
+          if (action === "desactivar") {
             await unsubscribe();
 
             renderCenters();
@@ -920,22 +930,38 @@
 
             status.textContent =
               "Notificaciones desactivadas.";
+
+          } else {
+            /*
+             * Tanto el registro inicial
+             * como la reconexión utilizan
+             * el mismo endpoint seguro.
+             */
+            await subscribe();
+
+            if (state.dirty) {
+              await savePreferences(
+                [...state.selected]
+              );
+
+              state.dirty = false;
+            }
+
+            await updateStatus(true);
           }
 
         } catch (error) {
           status.textContent =
+            "No se pudo completar la operación: " +
             error.message;
 
           /*
-           * Si el registro se completó
-           * pero falló el guardado,
-           * no ocultamos la suscripción.
+           * Conservamos las credenciales
+           * y preferencias si la renovación
+           * falla.
            */
           if (readCredentials()) {
             state.registered = true;
-
-            activateButton.textContent =
-              "Desactivar notificaciones";
           }
 
         } finally {
@@ -945,7 +971,7 @@
     );
 
     /*
-     * GUARDAR Y VERIFICAR PREFERENCIAS
+     * GUARDAR PREFERENCIAS
      */
 
     saveButton.addEventListener(
@@ -969,10 +995,6 @@
             requestedIds
           );
 
-          /*
-           * Confirmar leyendo nuevamente
-           * las preferencias almacenadas.
-           */
           const server =
             await getServerSubscription();
 
@@ -992,8 +1014,8 @@
 
           if (!confirmed) {
             throw new Error(
-              "El servidor no confirmó todos " +
-              "los establecimientos seleccionados."
+              "El servidor no confirmó " +
+              "la selección."
             );
           }
 
