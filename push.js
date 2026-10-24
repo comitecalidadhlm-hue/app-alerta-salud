@@ -1,19 +1,16 @@
 
 /*
- * APP ALERTA SALUD V1.10.7
- * Gestión de suscripciones Web Push
+ * APP ALERTA SALUD V1.10.8
+ * Web Push - Interfaz compacta
  *
  * Archivo: push.js
  * Acción: REEMPLAZAR COMPLETO
  *
- * Requiere:
- * window.ALERTA_PUSH.publicKey
- * window.ALERTA_PUSH.subscriptionEndpoint
+ * Integra la configuración de avisos en un
+ * desplegable dentro del Centro de Notificaciones.
  *
- * Seguridad:
- * - Nunca almacena claves privadas VAPID.
- * - Guarda la credencial individual en el navegador.
- * - No registra dispositivos mientras TEST_MODE sea true.
+ * Mantiene TEST_MODE para impedir registros
+ * reales antes de completar la seguridad.
  */
 
 (() => {
@@ -27,8 +24,6 @@
     CONFIG.subscriptionEndpoint || ""
   ).replace(/\/+$/, "");
 
-  // Mantener en true hasta completar las pruebas
-  // y los controles de seguridad del backend.
   const TEST_MODE = true;
 
   const STORAGE_KEY =
@@ -66,9 +61,7 @@
   }
 
   function configured() {
-    if (!PUBLIC_KEY || !API) {
-      return false;
-    }
+    if (!PUBLIC_KEY || !API) return false;
 
     try {
       const url = new URL(API);
@@ -88,8 +81,7 @@
     );
 
     const binary = atob(
-      value
-        .replace(/-/g, "+")
+      value.replace(/-/g, "+")
         .replace(/_/g, "/") +
       padding
     );
@@ -118,7 +110,6 @@
       }
 
       return data;
-
     } catch {
       return null;
     }
@@ -180,9 +171,7 @@
 
     try {
       result = await response.json();
-    } catch {
-      // Se informa el error HTTP.
-    }
+    } catch {}
 
     if (!response.ok) {
       const error = new Error(
@@ -241,7 +230,7 @@
 
     if (!credentials) {
       throw new Error(
-        "Este dispositivo no tiene una credencial de registro."
+        "El dispositivo no está registrado."
       );
     }
 
@@ -257,7 +246,7 @@
   async function subscribe() {
     if (TEST_MODE) {
       throw new Error(
-        "El registro de dispositivos aún está en pruebas."
+        "El registro continúa en preparación."
       );
     }
 
@@ -275,7 +264,8 @@
     const credentials = readCredentials();
 
     if (subscription && credentials) {
-      const server = await getServerSubscription();
+      const server =
+        await getServerSubscription();
 
       if (server?.active) {
         state.subscription = subscription;
@@ -285,8 +275,7 @@
 
     if (subscription && !credentials) {
       throw new Error(
-        "Existe una suscripción anterior sin credencial. " +
-        "Es necesario recuperarla de forma segura antes de continuar."
+        "Existe una suscripción anterior sin credencial."
       );
     }
 
@@ -296,7 +285,7 @@
 
       if (permission !== "granted") {
         throw new Error(
-          "No se otorgó permiso para recibir notificaciones."
+          "No se otorgó permiso para recibir avisos."
         );
       }
 
@@ -308,8 +297,6 @@
         });
     }
 
-    let created = false;
-
     try {
       const result = await request(
         "/subscribe",
@@ -320,14 +307,13 @@
       );
 
       saveCredentials(result);
-      created = true;
 
       state.subscription = subscription;
 
       return subscription;
 
     } catch (error) {
-      if (!created && error.status !== 409) {
+      if (error.status !== 409) {
         await subscription
           .unsubscribe()
           .catch(() => {});
@@ -340,7 +326,7 @@
   async function unsubscribe() {
     if (TEST_MODE) {
       throw new Error(
-        "La gestión de dispositivos aún está en pruebas."
+        "La gestión de dispositivos está en preparación."
       );
     }
 
@@ -354,9 +340,10 @@
       );
 
       clearCredentials();
+
     } else if (subscription) {
       throw new Error(
-        "No se puede cancelar el registro remoto sin su credencial."
+        "No se puede cancelar el registro remoto sin credencial."
       );
     }
 
@@ -381,42 +368,69 @@
       return;
     }
 
-    const section = element("section");
-    section.id = "asPushPreferences";
+    /*
+     * Se usa details/summary nativo:
+     * compacto, accesible y cerrado
+     * por defecto.
+     */
 
-    section.style.cssText = [
-      "margin:16px 0",
-      "padding:18px",
-      "border:1px solid #d5e0e9",
-      "border-radius:12px",
-      "background:var(--card,#fff)"
+    const details = element("details");
+    details.id = "asPushPreferences";
+
+    details.style.cssText = [
+      "margin:10px 0",
+      "border-top:1px solid #d5e0e9",
+      "padding-top:10px"
     ].join(";");
 
-    const heading = element(
-      "h3",
-      "🔔 Avisos en tu dispositivo"
+    const summary = element(
+      "summary",
+      "🔔 Configurar avisos en mi dispositivo"
     );
+
+    summary.style.cssText = [
+      "cursor:pointer",
+      "font-weight:600",
+      "font-size:13px",
+      "padding:6px 0",
+      "list-style-position:inside"
+    ].join(";");
+
+    const content = element("div");
+
+    content.style.cssText = [
+      "padding:10px 0 4px"
+    ].join(";");
 
     const description = element(
       "p",
-      "Elegí los establecimientos de los que " +
-      "deseás recibir comunicaciones oficiales."
+      "Seleccioná los establecimientos de los " +
+      "que querés recibir avisos oficiales."
     );
 
+    description.style.cssText = [
+      "font-size:12px",
+      "margin:0 0 10px"
+    ].join(";");
+
     const status = element("p");
+
     status.setAttribute("role", "status");
-    status.setAttribute(
-      "aria-live",
-      "polite"
-    );
+    status.setAttribute("aria-live", "polite");
+
+    status.style.cssText = [
+      "font-size:12px",
+      "margin:8px 0",
+      "color:var(--muted,#64748b)"
+    ].join(";");
 
     const centersContainer =
       element("div");
 
     centersContainer.style.cssText = [
       "display:grid",
-      "gap:10px",
-      "margin:14px 0"
+      "gap:6px",
+      "margin:10px 0"
     ].join(";");
 
     const activateButton =
@@ -429,20 +443,19 @@
 
     const saveButton = element(
       "button",
-      "Guardar establecimientos"
+      "Guardar selección"
     );
 
     saveButton.type = "button";
     saveButton.className = "secondary";
-
-    saveButton.style.marginLeft = "8px";
 
     const buttons = element("div");
 
     buttons.style.cssText = [
       "display:flex",
       "flex-wrap:wrap",
-      "gap:8px"
+      "gap:8px",
+      "margin-top:10px"
     ].join(";");
 
     buttons.append(
@@ -450,32 +463,39 @@
       saveButton
     );
 
-    section.append(
-      heading,
+    content.append(
       description,
-      status
+      status,
+      centersContainer,
+      buttons
     );
 
-    parent.append(section);
+    details.append(
+      summary,
+      content
+    );
+
+    /*
+     * Se integra en el espacio existente,
+     * sin generar una tarjeta adicional.
+     */
+    parent.append(details);
 
     if (!supported()) {
       status.textContent =
-        "Este navegador no admite notificaciones Web Push.";
+        "Este navegador no admite Web Push.";
+
+      buttons.hidden = true;
       return;
     }
 
     if (!configured()) {
       status.textContent =
-        "La recepción de avisos push está en preparación. " +
-        "Las comunicaciones oficiales siguen disponibles " +
-        "en el Centro de Notificaciones.";
+        "Las notificaciones están en preparación.";
+
+      buttons.hidden = true;
       return;
     }
-
-    section.append(
-      centersContainer,
-      buttons
-    );
 
     function renderCenters() {
       centersContainer.replaceChildren();
@@ -497,10 +517,11 @@
         label.style.cssText = [
           "display:flex",
           "align-items:center",
-          "gap:10px",
-          "padding:10px",
+          "gap:8px",
+          "padding:7px 8px",
           "border:1px solid #e2e8f0",
-          "border-radius:8px",
+          "border-radius:7px",
+          "font-size:12px",
           "cursor:pointer"
         ].join(";");
 
@@ -559,9 +580,7 @@
             "Desactivar notificaciones";
 
           status.textContent =
-            "Dispositivo registrado. " +
-            "Seleccioná los establecimientos " +
-            "y guardá tus preferencias.";
+            "Dispositivo registrado.";
 
           return;
         }
@@ -571,10 +590,7 @@
         "Activar notificaciones";
 
       status.textContent =
-        TEST_MODE
-          ? "Vista previa: la selección está disponible, " +
-            "pero el registro de dispositivos aún no está habilitado."
-          : "Las notificaciones están desactivadas.";
+        "Notificaciones desactivadas.";
     }
 
     function setBusy(value) {
@@ -590,9 +606,7 @@
     activateButton.addEventListener(
       "click",
       async () => {
-        if (state.busy || TEST_MODE) {
-          return;
-        }
+        if (state.busy || TEST_MODE) return;
 
         setBusy(true);
 
@@ -619,9 +633,7 @@
     saveButton.addEventListener(
       "click",
       async () => {
-        if (state.busy || TEST_MODE) {
-          return;
-        }
+        if (state.busy || TEST_MODE) return;
 
         setBusy(true);
 
@@ -631,7 +643,7 @@
           );
 
           status.textContent =
-            "Preferencias guardadas correctamente.";
+            "Selección guardada.";
 
         } catch (error) {
           status.textContent =
@@ -642,32 +654,40 @@
       }
     );
 
-    async function initialize() {
-      setBusy(true);
+    let initialized = false;
 
-      try {
-        await loadCenters();
-
-        renderCenters();
-
-        if (TEST_MODE) {
-          status.textContent =
-            "Vista previa de establecimientos. " +
-            "La activación de notificaciones " +
-            "estará disponible después de las pruebas.";
-        } else {
-          await update();
+    details.addEventListener(
+      "toggle",
+      async () => {
+        if (!details.open || initialized) {
+          return;
         }
 
-      } catch (error) {
-        status.textContent =
-          error.message;
-      } finally {
-        setBusy(false);
-      }
-    }
+        initialized = true;
+        setBusy(true);
 
-    initialize();
+        try {
+          await loadCenters();
+
+          renderCenters();
+
+          if (TEST_MODE) {
+            status.textContent =
+              "Vista previa: la activación estará " +
+              "disponible después de las pruebas.";
+          } else {
+            await update();
+          }
+
+        } catch (error) {
+          status.textContent =
+            error.message;
+          initialized = false;
+        } finally {
+          setBusy(false);
+        }
+      }
+    );
   }
 
   mount();
