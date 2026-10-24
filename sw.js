@@ -1,10 +1,10 @@
 
 /*
- * APP ALERTA SALUD V1.9.4
+ * APP ALERTA SALUD V1.9.5
  * Service Worker
  */
 
-const CACHE = "alerta-salud-v1-9-4";
+const CACHE = "alerta-salud-v1-9-5";
 
 const ASSETS = [
   "./",
@@ -14,6 +14,7 @@ const ASSETS = [
   "./map.js",
   "./care.js",
   "./institucional.js",
+  "./notificaciones.js",
   "./supabase-config.js",
   "./manifest.webmanifest",
   "./icon.svg"
@@ -53,14 +54,10 @@ self.addEventListener("fetch", event => {
 
   const url = new URL(request.url);
 
-  // No interceptar APIs externas ni Supabase.
   if (url.origin !== self.location.origin) {
     return;
   }
 
-  // Las navegaciones usan primero la red.
-  // Si no hay conexión, se usa el HTML
-  // previamente almacenado.
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request).catch(async () => {
@@ -72,8 +69,6 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  // Recursos locales: red primero,
-  // caché como respaldo.
   event.respondWith(
     fetch(request)
       .then(response => {
