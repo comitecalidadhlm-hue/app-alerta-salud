@@ -1,8 +1,7 @@
 
 /*
- * APP ALERTA SALUD V1.9.5
- * Configuracion de Supabase
- * y carga de modulos.
+ * APP ALERTA SALUD V1.9.6
+ * Configuracion y carga de modulos.
  */
 
 window.ALERTA_SUPABASE = Object.freeze({
@@ -14,37 +13,37 @@ window.ALERTA_SUPABASE = Object.freeze({
 document.addEventListener(
   "DOMContentLoaded",
   () => {
+    const modules = [
+      "./institucional.js",
+      "./notificaciones.js",
+      "./navegacion.js"
+    ];
 
-    // Modulo institucional existente.
-    const institutional =
-      document.createElement("script");
+    // Carga secuencial para que navegación
+    // encuentre los módulos ya construidos.
+    function loadNext(index) {
+      if (index >= modules.length) return;
 
-    institutional.src = "./institucional.js";
-    institutional.defer = true;
+      const script =
+        document.createElement("script");
 
-    institutional.onerror = () => {
-      console.warn(
-        "No se pudo cargar el módulo institucional"
-      );
-    };
+      script.src = modules[index];
+      script.async = false;
 
-    document.body.appendChild(institutional);
+      script.onload = () => {
+        loadNext(index + 1);
+      };
 
-    // Nuevo Centro de Notificaciones.
-    // Se carga cuando app.js ya inicializo
-    // window.AlertaSalud.
-    const notifications =
-      document.createElement("script");
+      script.onerror = () => {
+        console.error(
+          "No se pudo cargar:",
+          modules[index]
+        );
+      };
 
-    notifications.src = "./notificaciones.js";
-    notifications.defer = true;
+      document.body.appendChild(script);
+    }
 
-    notifications.onerror = () => {
-      console.warn(
-        "No se pudo cargar el Centro de Notificaciones"
-      );
-    };
-
-    document.body.appendChild(notifications);
+    loadNext(0);
   }
 );
