@@ -1,35 +1,29 @@
 
 /*
- * APP ALERTA SALUD V1.10.10
- * Web Push - Interfaz compacta corregida
+ * APP ALERTA SALUD V1.10.11
+ * Web Push - Configuración integrada y compacta
  *
  * Archivo: push.js
  * Acción: REEMPLAZAR COMPLETO
  *
- * La configuración se integra en la barra
- * existente del Centro de Notificaciones.
- *
- * El desplegable ocupa todo el ancho.
- * No se crean tarjetas adicionales.
- *
- * TEST_MODE permanece activado.
+ * Corrección:
+ * - Dos controles en la misma fila.
+ * - Configuración desplegable a ancho completo.
+ * - Sin tarjetas ni módulos adicionales.
+ * - TEST_MODE activo: sin registros reales.
  */
 
 (() => {
   "use strict";
 
   const CONFIG = window.ALERTA_PUSH || {};
-
   const PUBLIC_KEY = CONFIG.publicKey || "";
-
-  const API = (
+  const API = String(
     CONFIG.subscriptionEndpoint || ""
   ).replace(/\/+$/, "");
 
   const TEST_MODE = true;
-
-  const STORAGE_KEY =
-    "alerta_salud_push_device_v1";
+  const STORAGE_KEY = "alerta_salud_push_device_v1";
 
   const state = {
     registration: null,
@@ -96,10 +90,7 @@
 
   function readCredentials() {
     try {
-      const raw = localStorage.getItem(
-        STORAGE_KEY
-      );
-
+      const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return null;
 
       const data = JSON.parse(raw);
@@ -174,7 +165,7 @@
     try {
       result = await response.json();
     } catch {
-      // Conserva el error HTTP.
+      // Conservamos el estado HTTP.
     }
 
     if (!response.ok) {
@@ -209,9 +200,7 @@
 
     const result = await response.json();
 
-    state.centers = Array.isArray(
-      result.centers
-    )
+    state.centers = Array.isArray(result.centers)
       ? result.centers
       : [];
 
@@ -223,10 +212,7 @@
 
     if (!credentials) return null;
 
-    return request(
-      "/subscription",
-      credentials
-    );
+    return request("/subscription", credentials);
   }
 
   async function savePreferences(centerIds) {
@@ -238,13 +224,10 @@
       );
     }
 
-    return request(
-      "/preferences",
-      {
-        ...credentials,
-        centerIds
-      }
-    );
+    return request("/preferences", {
+      ...credentials,
+      centerIds
+    });
   }
 
   async function subscribe() {
@@ -268,8 +251,7 @@
     const credentials = readCredentials();
 
     if (subscription && credentials) {
-      const server =
-        await getServerSubscription();
+      const server = await getServerSubscription();
 
       if (server?.active) {
         state.subscription = subscription;
@@ -293,33 +275,24 @@
         );
       }
 
-      subscription =
-        await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey:
-            decodeKey(PUBLIC_KEY)
-        });
+      subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: decodeKey(PUBLIC_KEY)
+      });
     }
 
     try {
-      const result = await request(
-        "/subscribe",
-        {
-          subscription:
-            subscription.toJSON()
-        }
-      );
+      const result = await request("/subscribe", {
+        subscription: subscription.toJSON()
+      });
 
       saveCredentials(result);
-
       state.subscription = subscription;
 
       return subscription;
-
     } catch (error) {
       if (error.status !== 409) {
-        await subscription
-          .unsubscribe()
+        await subscription.unsubscribe()
           .catch(() => {});
       }
 
@@ -338,13 +311,8 @@
     const credentials = readCredentials();
 
     if (credentials) {
-      await request(
-        "/unsubscribe",
-        credentials
-      );
-
+      await request("/unsubscribe", credentials);
       clearCredentials();
-
     } else if (subscription) {
       throw new Error(
         "No se puede cancelar el registro remoto sin credencial."
@@ -370,98 +338,80 @@
     if (
       !parent ||
       !actions ||
-      document.getElementById(
-        "asPushPreferences"
-      )
+      document.getElementById("asPushPreferences")
     ) {
       return;
     }
 
-    /*
-     * La barra tendrá dos filas:
-     *
-     * 1. Botones compactos.
-     * 2. Configuración expandida a todo el ancho.
-     *
-     * No se crea un módulo adicional.
-     */
+    const reloadButton = actions.querySelector(
+      "#asNotReload"
+    );
 
-    actions.style.cssText += [
-      ";display:grid",
-      "grid-template-columns:minmax(0,1fr) minmax(0,1fr)",
-      "column-gap:8px",
-      "row-gap:0",
-      "align-items:start"
-    ].join(";");
-
-    const reloadButton =
-      actions.querySelector("#asNotReload");
-
-    if (reloadButton) {
-      reloadButton.style.cssText += [
-        ";width:100%",
-        "min-width:0",
-        "min-height:38px",
-        "margin:0",
-        "font-size:11px",
-        "padding:8px 5px"
-      ].join(";");
-    }
-
-    const details = element("details");
-    details.id = "asPushPreferences";
+    if (!reloadButton) return;
 
     /*
-     * display:contents permite que summary
-     * y contenido participen directamente
-     * de la grilla visual.
+     * Estructura:
      *
-     * Para mantener el comportamiento nativo
-     * de details, usamos en cambio un contenedor
-     * de dos columnas y expandimos el contenido
-     * mediante una fila independiente.
+     * .as-notification-actions
+     *   ├─ #asNotReload
+     *   ├─ #asPushToggle
+     *   └─ #asPushPreferences (fila completa)
+     *
+     * No se usa display:contents ni details.
      */
 
-    details.style.cssText = [
-      "display:contents"
-    ].join(";");
+    actions.style.display = "grid";
+    actions.style.gridTemplateColumns =
+      "minmax(0,1fr) minmax(0,1fr)";
+    actions.style.columnGap = "8px";
+    actions.style.rowGap = "0";
+    actions.style.alignItems = "start";
 
-    const summary = element(
-      "summary",
+    reloadButton.style.width = "100%";
+    reloadButton.style.minWidth = "0";
+    reloadButton.style.minHeight = "38px";
+    reloadButton.style.margin = "0";
+    reloadButton.style.padding = "8px 5px";
+    reloadButton.style.fontSize = "11px";
+
+    const toggleButton = element(
+      "button",
       "🔔 Configurar avisos"
     );
 
-    summary.style.cssText = [
-      "cursor:pointer",
-      "font-weight:600",
-      "font-size:11px",
-      "padding:8px 5px",
+    toggleButton.id = "asPushToggle";
+    toggleButton.type = "button";
+    toggleButton.className = "secondary";
+
+    toggleButton.style.cssText = [
+      "width:100%",
+      "min-width:0",
       "min-height:38px",
-      "border:1px solid #c5d4e2",
-      "border-radius:8px",
-      "background:#eef3f8",
-      "color:#16344d",
-      "display:flex",
-      "align-items:center",
-      "justify-content:center",
-      "gap:4px",
+      "margin:0",
+      "padding:8px 5px",
+      "font-size:11px",
       "text-align:center"
     ].join(";");
 
-    /*
-     * El contenido se coloca en un contenedor
-     * independiente que ocupa las dos columnas.
-     */
+    toggleButton.setAttribute(
+      "aria-expanded",
+      "false"
+    );
+
+    toggleButton.setAttribute(
+      "aria-controls",
+      "asPushPreferences"
+    );
 
     const content = element("div");
-    content.id = "asPushContent";
-
+    content.id = "asPushPreferences";
     content.hidden = true;
 
     content.style.cssText = [
       "grid-column:1 / -1",
       "width:100%",
       "min-width:0",
+      "box-sizing:border-box",
       "padding:10px 0 2px",
       "font-size:12px"
     ].join(";");
@@ -475,7 +425,6 @@
     description.style.margin = "0 0 8px";
 
     const status = element("p");
-
     status.setAttribute("role", "status");
     status.setAttribute("aria-live", "polite");
 
@@ -485,8 +434,7 @@
       "color:#526477"
     ].join(";");
 
-    const centersContainer =
-      element("div");
+    const centersContainer = element("div");
 
     centersContainer.style.cssText = [
       "display:grid",
@@ -494,20 +442,18 @@
       "margin:10px 0"
     ].join(";");
 
-    const activateButton =
-      element(
-        "button",
-        "Activar notificaciones"
-      );
+    const activateButton = element(
+      "button",
+      "Activar notificaciones"
+    );
 
     activateButton.type = "button";
     activateButton.className = "secondary";
 
-    const saveButton =
-      element(
-        "button",
-        "Guardar selección"
-      );
+    const saveButton = element(
+      "button",
+      "Guardar selección"
+    );
 
     saveButton.type = "button";
     saveButton.className = "secondary";
@@ -533,105 +479,39 @@
       buttons
     );
 
-    /*
-     * La fila superior contiene el botón
-     * existente y el nuevo desplegable.
-     *
-     * La segunda fila ocupa todo el ancho.
-     */
-
-    details.append(summary);
-
-    actions.append(details, content);
+    actions.append(toggleButton, content);
 
     /*
-     * Configuración visual de las dos filas.
+     * La configuración empieza cerrada.
+     * El atributo hidden mantiene la segunda
+     * fila fuera de la distribución.
      */
 
-    details.style.gridColumn = "2";
-    summary.setAttribute(
-      "aria-controls",
-      "asPushContent"
-    );
-
-    summary.setAttribute(
-      "aria-expanded",
-      "false"
-    );
-
-    /*
-     * Controlamos explícitamente el contenido
-     * para que no quede limitado al ancho
-     * de la segunda columna.
-     */
-
+    let opened = false;
     let initialized = false;
     let initializing = false;
 
-    function syncOpenState() {
-      const open = details.open;
+    function syncVisibility() {
+      content.hidden = !opened;
 
-      content.hidden = !open;
-
-      summary.setAttribute(
+      toggleButton.setAttribute(
         "aria-expanded",
-        String(open)
+        String(opened)
       );
+
+      toggleButton.textContent = opened
+        ? "🔔 Ocultar configuración"
+        : "🔔 Configurar avisos";
     }
 
-    details.addEventListener(
-      "toggle",
-      async () => {
-        syncOpenState();
+    function setBusy(value) {
+      state.busy = value;
 
-        if (
-          !details.open ||
-          initialized ||
-          initializing
-        ) {
-          return;
-        }
+      activateButton.disabled =
+        value || TEST_MODE;
 
-        initializing = true;
-        setBusy(true);
-
-        try {
-          await loadCenters();
-
-          renderCenters();
-
-          if (TEST_MODE) {
-            status.textContent =
-              "Vista previa: la activación estará " +
-              "disponible después de las pruebas.";
-          } else {
-            await update();
-          }
-
-          initialized = true;
-
-        } catch (error) {
-          status.textContent =
-            error.message;
-        } finally {
-          initializing = false;
-          setBusy(false);
-        }
-      }
-    );
-
-    if (!supported()) {
-      status.textContent =
-        "Este navegador no admite Web Push.";
-
-      buttons.hidden = true;
-    }
-
-    if (!configured()) {
-      status.textContent =
-        "Las notificaciones están en preparación.";
-
-      buttons.hidden = true;
+      saveButton.disabled =
+        value || TEST_MODE;
     }
 
     function renderCenters() {
@@ -644,7 +524,6 @@
             "No hay establecimientos disponibles."
           )
         );
-
         return;
       }
 
@@ -664,38 +543,33 @@
           "box-sizing:border-box"
         ].join(";");
 
-        const checkbox =
-          document.createElement("input");
-
+        const checkbox = element("input");
         checkbox.type = "checkbox";
         checkbox.value = String(center.id);
 
-        checkbox.checked =
-          state.selected.has(Number(center.id));
-
-        checkbox.addEventListener(
-          "change",
-          () => {
-            const id = Number(center.id);
-
-            if (checkbox.checked) {
-              state.selected.add(id);
-            } else {
-              state.selected.delete(id);
-            }
-          }
+        checkbox.checked = state.selected.has(
+          Number(center.id)
         );
+
+        checkbox.addEventListener("change", () => {
+          const id = Number(center.id);
+
+          if (checkbox.checked) {
+            state.selected.add(id);
+          } else {
+            state.selected.delete(id);
+          }
+        });
 
         const name = element(
           "span",
           center.nombre
         );
 
-        label.append(
-          checkbox,
-          name
-        );
+        name.style.minWidth = "0";
+        name.style.overflowWrap = "anywhere";
 
+        label.append(checkbox, name);
         centersContainer.append(label);
       }
     }
@@ -705,8 +579,7 @@
       const credentials = readCredentials();
 
       if (subscription && credentials) {
-        const server =
-          await getServerSubscription();
+        const server = await getServerSubscription();
 
         if (server?.active) {
           state.selected = new Set(
@@ -732,16 +605,6 @@
         "Notificaciones desactivadas.";
     }
 
-    function setBusy(value) {
-      state.busy = value;
-
-      activateButton.disabled =
-        value || TEST_MODE;
-
-      saveButton.disabled =
-        value || TEST_MODE;
-    }
-
     activateButton.addEventListener(
       "click",
       async () => {
@@ -759,10 +622,8 @@
           }
 
           await update();
-
         } catch (error) {
-          status.textContent =
-            error.message;
+          status.textContent = error.message;
         } finally {
           setBusy(false);
         }
@@ -783,17 +644,65 @@
 
           status.textContent =
             "Selección guardada.";
-
         } catch (error) {
-          status.textContent =
-            error.message;
+          status.textContent = error.message;
         } finally {
           setBusy(false);
         }
       }
     );
 
-    syncOpenState();
+    toggleButton.addEventListener(
+      "click",
+      async () => {
+        opened = !opened;
+        syncVisibility();
+
+        if (
+          !opened ||
+          initialized ||
+          initializing
+        ) {
+          return;
+        }
+
+        initializing = true;
+        setBusy(true);
+
+        try {
+          if (!configured()) {
+            throw new Error(
+              "El servicio push está en preparación."
+            );
+          }
+
+          await loadCenters();
+          renderCenters();
+
+          if (!supported()) {
+            status.textContent =
+              "Este navegador no admite Web Push.";
+            buttons.hidden = true;
+          } else if (TEST_MODE) {
+            status.textContent =
+              "Vista previa: la activación estará " +
+              "disponible después de las pruebas.";
+          } else {
+            await update();
+          }
+
+          initialized = true;
+        } catch (error) {
+          status.textContent = error.message;
+          buttons.hidden = true;
+        } finally {
+          initializing = false;
+          setBusy(false);
+        }
+      }
+    );
+
+    syncVisibility();
     setBusy(false);
   }
 
