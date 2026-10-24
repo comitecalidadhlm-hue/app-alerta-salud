@@ -1,10 +1,10 @@
 
 /*
- * APP ALERTA SALUD V1.9.5
+ * APP ALERTA SALUD V1.9.6
  * Service Worker
  */
 
-const CACHE = "alerta-salud-v1-9-5";
+const CACHE = "alerta-salud-v1-9-6";
 
 const ASSETS = [
   "./",
@@ -15,6 +15,7 @@ const ASSETS = [
   "./care.js",
   "./institucional.js",
   "./notificaciones.js",
+  "./navegacion.js",
   "./supabase-config.js",
   "./manifest.webmanifest",
   "./icon.svg"
