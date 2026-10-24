@@ -1,18 +1,16 @@
 
 /*
- * APP ALERTA SALUD V1.10.13
- * Configuración Web Push integrada
+ * APP ALERTA SALUD V1.10.15
+ * Web Push - Prueba controlada de dispositivos
  *
  * Archivo: push.js
  * Acción: REEMPLAZAR COMPLETO
  *
- * Tres pestañas:
- * - Avisos vigentes
- * - Historial
- * - Configurar avisos
+ * Conserva las tres pestañas.
+ * Permite registrar, consultar, renovar,
+ * guardar preferencias y dar de baja.
  *
- * Sin módulos ni tarjetas adicionales.
- * TEST_MODE: no registra dispositivos.
+ * No envía notificaciones.
  */
 
 (() => {
@@ -20,25 +18,26 @@
 
   const CONFIG = window.ALERTA_PUSH || {};
 
-  const PUBLIC_KEY = CONFIG.publicKey || "";
+  const PUBLIC_KEY = String(
+    CONFIG.publicKey || ""
+  );
 
   const API = String(
     CONFIG.subscriptionEndpoint || ""
   ).replace(/\/+$/, "");
-
-  const TEST_MODE = true;
 
   const STORAGE_KEY =
     "alerta_salud_push_device_v1";
 
   const state = {
     registration: null,
-    subscription: null,
     centers: [],
     selected: new Set(),
     initialized: false,
     loading: false,
-    mode: "vigentes"
+    busy: false,
+    mode: "vigentes",
+    registered: false
   };
 
   const $ = id => document.getElementById(id);
@@ -81,6 +80,21 @@
     }
   }
 
+  function decodeKey(value) {
+    const padded = value
+      .replace(/-/g, "+")
+      .replace(/_/g, "/")
+      .padEnd(
+        Math.ceil(value.length / 4) * 4,
+        "="
+      );
+
+    return Uint8Array.from(
+      atob(padded),
+      char => char.charCodeAt(0)
+    );
+  }
+
   function readCredentials() {
     try {
       const raw = localStorage.getItem(
@@ -104,6 +118,20 @@
     }
   }
 
+  function saveCredentials(data) {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        subscriptionId: data.subscriptionId,
+        token: data.token
+      })
+    );
+  }
+
+  function clearCredentials() {
+    localStorage.removeItem(STORAGE_KEY);
+  }
+
   async function registration() {
     if (!supported()) {
       throw new Error(
@@ -122,16 +150,13 @@
   async function refresh() {
     const reg = await registration();
 
-    state.subscription =
-      await reg.pushManager.getSubscription();
-
-    return state.subscription;
+    return reg.pushManager.getSubscription();
   }
 
   async function request(path, body) {
     if (!configured()) {
       throw new Error(
-        "El servicio de notificaciones no está configurado."
+        "El servicio Web Push no está configurado."
       );
     }
 
@@ -152,22 +177,21 @@
       .catch(() => ({}));
 
     if (!response.ok) {
-      throw new Error(
+      const error = new Error(
         result.error ||
         "No se pudo completar la operación."
       );
+
+      error.status = response.status;
+      error.code = result.code || "";
+
+      throw error;
     }
 
     return result;
   }
 
   async function loadCenters() {
-    if (!configured()) {
-      throw new Error(
-        "El servicio está en preparación."
-      );
-    }
-
     const response = await fetch(
       API + "/centers",
       {
@@ -204,18 +228,104 @@
     );
   }
 
-  async function savePreferences(centerIds) {
-    if (TEST_MODE) {
+  async function subscribe() {
+    const reg = await registration();
+
+    const existing = await reg.pushManager
+      .getSubscription();
+
+    const credentials = readCredentials();
+
+    /*
+     * Si existe una suscripción local
+     * sin credencial, no intentamos
+     * apropiarnos del endpoint remoto.
+     */
+    if (existing && !credentials) {
       throw new Error(
-        "El guardado estará disponible al finalizar las pruebas."
+        "Este navegador conserva una suscripción " +
+        "anterior sin credencial de administración. " +
+        "No se modificó por seguridad."
       );
     }
 
+    let subscription = existing;
+    let createdLocally = false;
+
+    if (!subscription) {
+      const permission =
+        await Notification.requestPermission();
+
+      if (permission !== "granted") {
+        throw new Error(
+          "No se concedió permiso para recibir avisos."
+        );
+      }
+
+      subscription =
+        await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: decodeKey(
+            PUBLIC_KEY
+          )
+        });
+
+      createdLocally = true;
+    }
+
+    try {
+      const payload = {
+        subscription: subscription.toJSON()
+      };
+
+      if (credentials) {
+        payload.subscriptionId =
+          credentials.subscriptionId;
+
+        payload.token = credentials.token;
+      }
+
+      const result = await request(
+        "/subscribe",
+        payload
+      );
+
+      if (
+        !result.subscriptionId ||
+        !result.token
+      ) {
+        throw new Error(
+          "El servidor no devolvió las credenciales."
+        );
+      }
+
+      saveCredentials(result);
+
+      state.registered = true;
+
+      return result;
+
+    } catch (error) {
+      /*
+       * Nunca damos de baja una
+       * suscripción local preexistente
+       * ante un error de comunicación.
+       */
+      if (createdLocally) {
+        await subscription.unsubscribe()
+          .catch(() => {});
+      }
+
+      throw error;
+    }
+  }
+
+  async function savePreferences(centerIds) {
     const credentials = readCredentials();
 
     if (!credentials) {
       throw new Error(
-        "Este dispositivo no está registrado."
+        "Primero activá las notificaciones."
       );
     }
 
@@ -226,6 +336,35 @@
         centerIds
       }
     );
+  }
+
+  async function unsubscribe() {
+    const credentials = readCredentials();
+
+    if (!credentials) {
+      throw new Error(
+        "No hay credenciales para dar de baja el dispositivo."
+      );
+    }
+
+    /*
+     * Primero revocamos el acceso remoto.
+     * Después eliminamos la suscripción
+     * local y las credenciales.
+     */
+    await request(
+      "/unsubscribe",
+      credentials
+    );
+
+    clearCredentials();
+    state.registered = false;
+
+    const subscription = await refresh();
+
+    if (subscription) {
+      await subscription.unsubscribe();
+    }
   }
 
   function mount() {
@@ -250,23 +389,14 @@
       return;
     }
 
-    /*
-     * TERCERA PESTAÑA
-     */
-
     const settingsTab = create(
       "button",
       "⚙ Configurar",
       "as-notification-tab"
     );
 
-    settingsTab.type = "button";
     settingsTab.id = "asNotSettings";
-
-    settingsTab.setAttribute(
-      "aria-controls",
-      "asPushPreferences"
-    );
+    settingsTab.type = "button";
 
     tabs.append(settingsTab);
 
@@ -287,17 +417,10 @@
       button.style.lineHeight = "1.25";
     }
 
-    /*
-     * CONTENIDO DE CONFIGURACIÓN
-     *
-     * Se utiliza el mismo espacio
-     * de los avisos y el historial.
-     */
-
     const panel = create("div");
+
     panel.id = "asPushPreferences";
     panel.hidden = true;
-    panel.style.display = "none";
 
     panel.style.cssText = [
       "display:none",
@@ -367,7 +490,6 @@
     );
 
     activateButton.type = "button";
-    activateButton.disabled = true;
 
     const saveButton = create(
       "button",
@@ -376,7 +498,6 @@
     );
 
     saveButton.type = "button";
-    saveButton.disabled = true;
 
     buttons.append(
       activateButton,
@@ -391,21 +512,10 @@
       buttons
     );
 
-    /*
-     * Insertar debajo de las pestañas,
-     * dentro del Centro existente.
-     */
-
     tabs.insertAdjacentElement(
       "afterend",
       panel
     );
-
-    /*
-     * Elementos existentes:
-     * se ocultan solamente cuando
-     * se abre Configurar.
-     */
 
     const regularContent = [
       parent.querySelector(
@@ -420,11 +530,6 @@
         ".as-notification-disclaimer"
       )
     ].filter(Boolean);
-
-    /*
-     * Por seguridad, no modificamos
-     * la lógica de consulta de avisos.
-     */
 
     function showRegularContent(show) {
       for (const node of regularContent) {
@@ -476,9 +581,13 @@
       );
     }
 
-    /*
-     * RENDERIZAR ESTABLECIMIENTOS
-     */
+    function setBusy(value) {
+      state.busy = value;
+
+      activateButton.disabled = value;
+      saveButton.disabled =
+        value || !state.registered;
+    }
 
     function renderCenters() {
       centersContainer.replaceChildren();
@@ -524,9 +633,7 @@
         checkbox.addEventListener(
           "change",
           () => {
-            const id = Number(
-              center.id
-            );
+            const id = Number(center.id);
 
             if (checkbox.checked) {
               state.selected.add(id);
@@ -554,9 +661,62 @@
       }
     }
 
-    /*
-     * ABRIR CONFIGURACIÓN
-     */
+    async function updateStatus() {
+      const credentials = readCredentials();
+
+      if (!credentials) {
+        state.registered = false;
+        activateButton.textContent =
+          "Activar notificaciones";
+
+        status.textContent =
+          "Notificaciones desactivadas.";
+
+        setBusy(false);
+        return;
+      }
+
+      try {
+        const server =
+          await getServerSubscription();
+
+        const local = await refresh();
+
+        if (server?.active && local) {
+          state.registered = true;
+
+          state.selected = new Set(
+            (server.centerIds || []).map(Number)
+          );
+
+          renderCenters();
+
+          activateButton.textContent =
+            "Desactivar notificaciones";
+
+          status.textContent =
+            "Dispositivo registrado. " +
+            "Los envíos de prueba todavía " +
+            "no están habilitados.";
+        } else {
+          state.registered = false;
+
+          status.textContent =
+            "La suscripción requiere revisión.";
+
+          activateButton.textContent =
+            "Activar notificaciones";
+        }
+      } catch (error) {
+        state.registered = false;
+
+        status.textContent =
+          "No se pudo verificar el registro: " +
+          error.message;
+      }
+
+      setBusy(false);
+    }
 
     settingsTab.addEventListener(
       "click",
@@ -571,53 +731,34 @@
         }
 
         state.loading = true;
+        setBusy(true);
 
         status.textContent =
           "Consultando establecimientos...";
 
         try {
           await loadCenters();
-
           renderCenters();
 
           if (!supported()) {
             status.textContent =
-              "Este navegador no admite notificaciones Web Push.";
+              "Este navegador no admite Web Push.";
+
             buttons.hidden = true;
-          } else if (TEST_MODE) {
-            status.textContent =
-              "La activación está en preparación. " +
-              "Podés consultar los establecimientos disponibles.";
           } else {
-            const server =
-              await getServerSubscription();
-
-            if (server?.active) {
-              state.selected = new Set(
-                server.centerIds || []
-              );
-
-              renderCenters();
-            }
+            await updateStatus();
           }
 
           state.initialized = true;
-
         } catch (error) {
           status.textContent =
             error.message;
         } finally {
           state.loading = false;
+          setBusy(false);
         }
       }
     );
-
-    /*
-     * VOLVER A AVISOS O HISTORIAL
-     *
-     * Sus eventos originales siguen
-     * funcionando en notificaciones.js.
-     */
 
     current.addEventListener(
       "click",
@@ -628,15 +769,6 @@
       "click",
       () => setMode("historial")
     );
-
-    /*
-     * Cuando otra parte de la aplicación
-     * selecciona una pestaña original,
-     * sincronizamos la vista.
-     *
-     * Esto incluye los accesos del menú
-     * Más > Notificaciones / Historial.
-     */
 
     const observer = new MutationObserver(
       () => {
@@ -668,24 +800,60 @@
       attributeFilter: ["class"]
     });
 
-    /*
-     * MODO DE PRUEBA
-     *
-     * No se ejecutan altas, bajas
-     * ni modificaciones de suscripciones.
-     */
-
     activateButton.addEventListener(
       "click",
-      () => {
-        if (TEST_MODE) return;
+      async () => {
+        if (state.busy) return;
+
+        if (!configured() || !supported()) {
+          status.textContent =
+            "Web Push no está disponible.";
+          return;
+        }
+
+        const action = state.registered
+          ? "desactivar"
+          : "activar";
+
+        const message = action === "activar"
+          ? "¿Querés registrar este dispositivo " +
+            "para las pruebas de notificaciones? " +
+            "Todavía no se enviarán avisos."
+          : "¿Querés desactivar las notificaciones " +
+            "de este dispositivo?";
+
+        if (!window.confirm(message)) return;
+
+        setBusy(true);
+
+        try {
+          if (action === "activar") {
+            await subscribe();
+          } else {
+            await unsubscribe();
+          }
+
+          await updateStatus();
+        } catch (error) {
+          status.textContent =
+            error.message;
+        } finally {
+          setBusy(false);
+        }
       }
     );
 
     saveButton.addEventListener(
       "click",
       async () => {
-        if (TEST_MODE) return;
+        if (
+          state.busy ||
+          !state.registered
+        ) {
+          return;
+        }
+
+        setBusy(true);
 
         try {
           await savePreferences(
@@ -693,15 +861,18 @@
           );
 
           status.textContent =
-            "Preferencias guardadas.";
+            "Preferencias guardadas correctamente.";
         } catch (error) {
           status.textContent =
             error.message;
+        } finally {
+          setBusy(false);
         }
       }
     );
 
     setMode("vigentes");
+    setBusy(false);
   }
 
   mount();
