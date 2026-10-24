@@ -1,30 +1,20 @@
 
 /*
- * APP ALERTA SALUD V1.10.17
- *
+ * APP ALERTA SALUD V1.10.18
  * Archivo: push.js
- * Acción: REEMPLAZAR COMPLETO
  *
- * Recuperación segura de dispositivos:
- * - Detecta suscripción local perdida.
- * - Conserva preferencias de Supabase.
- * - Reconecta con credenciales existentes.
- * - Evita crear registros duplicados.
- * - Mantiene tres pestañas compactas.
+ * Registro, reconexión y preferencias.
+ * Prueba manual de Web Push.
+ * Compatible con Worker V1.10.18.
  *
- * Backend compatible: V1.10.14
- * Envíos automáticos: deshabilitados.
+ * Los envíos automáticos siguen deshabilitados.
  */
 
 (() => {
   "use strict";
 
   const CONFIG = window.ALERTA_PUSH || {};
-
-  const PUBLIC_KEY = String(
-    CONFIG.publicKey || ""
-  );
-
+  const PUBLIC_KEY = String(CONFIG.publicKey || "");
   const API = String(
     CONFIG.subscriptionEndpoint || ""
   ).replace(/\/+$/, "");
@@ -102,10 +92,7 @@
 
   function readCredentials() {
     try {
-      const raw = localStorage.getItem(
-        STORAGE_KEY
-      );
-
+      const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return null;
 
       const data = JSON.parse(raw);
@@ -154,7 +141,6 @@
 
   async function refresh() {
     const reg = await registration();
-
     return reg.pushManager.getSubscription();
   }
 
@@ -165,18 +151,15 @@
       );
     }
 
-    const response = await fetch(
-      API + path,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(body),
-        credentials: "omit",
-        cache: "no-store"
-      }
-    );
+    const response = await fetch(API + path, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body),
+      credentials: "omit",
+      cache: "no-store"
+    });
 
     const result = await response.json()
       .catch(() => ({}));
@@ -189,6 +172,7 @@
 
       error.status = response.status;
       error.code = result.code || "";
+      error.pushStatus = result.pushStatus || null;
 
       throw error;
     }
@@ -213,9 +197,7 @@
 
     const result = await response.json();
 
-    state.centers = Array.isArray(
-      result.centers
-    )
+    state.centers = Array.isArray(result.centers)
       ? result.centers
       : [];
 
@@ -227,10 +209,7 @@
 
     if (!credentials) return null;
 
-    return request(
-      "/subscription",
-      credentials
-    );
+    return request("/subscription", credentials);
   }
 
   async function subscribe() {
@@ -267,9 +246,7 @@
       subscription =
         await reg.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: decodeKey(
-            PUBLIC_KEY
-          )
+          applicationServerKey: decodeKey(PUBLIC_KEY)
         });
 
       createdLocally = true;
@@ -301,26 +278,13 @@
         );
       }
 
-      /*
-       * El backend devuelve las mismas
-       * credenciales al renovar.
-       */
       saveCredentials(result);
 
       state.registered = true;
       state.needsReconnect = false;
 
       return result;
-
     } catch (error) {
-      /*
-       * No dejamos una nueva suscripción
-       * local si el servidor rechazó
-       * la renovación.
-       *
-       * Nunca eliminamos una suscripción
-       * local preexistente.
-       */
       if (createdLocally) {
         await subscription.unsubscribe()
           .catch(() => {});
@@ -339,13 +303,10 @@
       );
     }
 
-    return request(
-      "/preferences",
-      {
-        ...credentials,
-        centerIds
-      }
-    );
+    return request("/preferences", {
+      ...credentials,
+      centerIds
+    });
   }
 
   async function unsubscribe() {
@@ -357,10 +318,7 @@
       );
     }
 
-    await request(
-      "/unsubscribe",
-      credentials
-    );
+    await request("/unsubscribe", credentials);
 
     clearCredentials();
 
@@ -374,6 +332,40 @@
     if (subscription) {
       await subscription.unsubscribe();
     }
+  }
+
+  async function sendTest() {
+    const credentials = readCredentials();
+
+    if (!credentials) {
+      throw new Error(
+        "No hay un dispositivo registrado."
+      );
+    }
+
+    const local = await refresh();
+
+    if (!local) {
+      throw new Error(
+        "Este navegador necesita reconectarse."
+      );
+    }
+
+    if (Notification.permission !== "granted") {
+      throw new Error(
+        "Chrome no tiene permiso para mostrar avisos."
+      );
+    }
+
+    const server = await getServerSubscription();
+
+    if (!server?.active) {
+      throw new Error(
+        "La suscripción no está activa."
+      );
+    }
+
+    return request("/test-push", credentials);
   }
 
   function mount() {
@@ -472,10 +464,7 @@
     const status = create("p");
 
     status.setAttribute("role", "status");
-    status.setAttribute(
-      "aria-live",
-      "polite"
-    );
+    status.setAttribute("aria-live", "polite");
 
     status.style.cssText = [
       "font-size:12px",
@@ -521,12 +510,42 @@
       saveButton
     );
 
+    /*
+     * BOTÓN DE PRUEBA
+     *
+     * Se muestra únicamente cuando
+     * el dispositivo está conectado.
+     */
+
+    const testButton = create(
+      "button",
+      "Enviar prueba",
+      "secondary"
+    );
+
+    testButton.type = "button";
+    testButton.hidden = true;
+
+    testButton.style.cssText = [
+      "font-size:12px",
+      "padding:9px 12px"
+    ].join(";");
+
+    const testArea = create("div");
+
+    testArea.style.cssText = [
+      "margin-top:10px"
+    ].join(";");
+
+    testArea.append(testButton);
+
     panel.append(
       title,
       description,
       status,
       centersContainer,
-      buttons
+      buttons,
+      testArea
     );
 
     tabs.insertAdjacentElement(
@@ -553,9 +572,7 @@
         node.hidden = !show;
 
         if (show) {
-          node.style.removeProperty(
-            "display"
-          );
+          node.style.removeProperty("display");
         } else {
           node.style.setProperty(
             "display",
@@ -584,13 +601,8 @@
       );
 
       if (isSettings) {
-        current.classList.remove(
-          "selected"
-        );
-
-        history.classList.remove(
-          "selected"
-        );
+        current.classList.remove("selected");
+        history.classList.remove("selected");
       }
 
       settingsTab.setAttribute(
@@ -606,6 +618,22 @@
 
       saveButton.disabled =
         value || !state.registered;
+
+      testButton.disabled = value;
+    }
+
+    function updateTestVisibility() {
+      const visible =
+        state.registered &&
+        !state.needsReconnect &&
+        supported() &&
+        Notification.permission === "granted";
+
+      testButton.hidden = !visible;
+      testArea.hidden = !visible;
+
+      testButton.style.display =
+        visible ? "inline-block" : "none";
     }
 
     /*
@@ -644,14 +672,10 @@
         const checkbox = create("input");
 
         checkbox.type = "checkbox";
-        checkbox.value = String(
-          center.id
-        );
+        checkbox.value = String(center.id);
 
         checkbox.checked =
-          state.selected.has(
-            Number(center.id)
-          );
+          state.selected.has(Number(center.id));
 
         checkbox.addEventListener(
           "change",
@@ -677,24 +701,15 @@
         );
 
         name.style.minWidth = "0";
-        name.style.overflowWrap =
-          "anywhere";
+        name.style.overflowWrap = "anywhere";
 
-        label.append(
-          checkbox,
-          name
-        );
-
+        label.append(checkbox, name);
         centersContainer.append(label);
       }
     }
 
     /*
-     * RECUPERACIÓN DEL ESTADO
-     *
-     * Las preferencias del servidor
-     * se cargan incluso cuando Chrome
-     * perdió su suscripción local.
+     * RECUPERAR ESTADO DEL SERVIDOR
      */
 
     async function updateStatus(
@@ -712,6 +727,7 @@
         status.textContent =
           "Notificaciones desactivadas.";
 
+        updateTestVisibility();
         setBusy(false);
         return;
       }
@@ -726,21 +742,15 @@
           );
         }
 
-        /*
-         * Recuperar preferencias sin
-         * borrar cambios pendientes.
-         */
         if (
           !preserveSelection ||
           !state.dirty
         ) {
           state.selected = new Set(
-            (server.centerIds || [])
-              .map(Number)
+            (server.centerIds || []).map(Number)
           );
 
           state.dirty = false;
-
           renderCenters();
         }
 
@@ -771,7 +781,6 @@
             "pero este navegador necesita " +
             "reconectarse para recibir avisos.";
         }
-
       } catch (error) {
         state.registered = false;
         state.needsReconnect = false;
@@ -784,6 +793,7 @@
           error.message;
       }
 
+      updateTestVisibility();
       setBusy(false);
     }
 
@@ -811,7 +821,6 @@
 
         try {
           await loadCenters();
-
           renderCenters();
 
           if (!supported()) {
@@ -819,15 +828,14 @@
               "Este navegador no admite Web Push.";
 
             buttons.hidden = true;
+            testArea.hidden = true;
           } else {
             await updateStatus(false);
           }
 
           state.initialized = true;
-
         } catch (error) {
-          status.textContent =
-            error.message;
+          status.textContent = error.message;
         } finally {
           state.loading = false;
           setBusy(false);
@@ -852,16 +860,12 @@
     const observer = new MutationObserver(
       () => {
         if (
-          current.classList.contains(
-            "selected"
-          ) &&
+          current.classList.contains("selected") &&
           state.mode === "configurar"
         ) {
           setMode("vigentes");
         } else if (
-          history.classList.contains(
-            "selected"
-          ) &&
+          history.classList.contains("selected") &&
           state.mode === "configurar"
         ) {
           setMode("historial");
@@ -930,13 +934,7 @@
 
             status.textContent =
               "Notificaciones desactivadas.";
-
           } else {
-            /*
-             * Tanto el registro inicial
-             * como la reconexión utilizan
-             * el mismo endpoint seguro.
-             */
             await subscribe();
 
             if (state.dirty) {
@@ -950,20 +948,17 @@
             await updateStatus(true);
           }
 
+          updateTestVisibility();
         } catch (error) {
           status.textContent =
             "No se pudo completar la operación: " +
             error.message;
 
-          /*
-           * Conservamos las credenciales
-           * y preferencias si la renovación
-           * falla.
-           */
           if (readCredentials()) {
             state.registered = true;
           }
 
+          updateTestVisibility();
         } finally {
           setBusy(false);
         }
@@ -991,9 +986,7 @@
         ].sort((a, b) => a - b);
 
         try {
-          await savePreferences(
-            requestedIds
-          );
+          await savePreferences(requestedIds);
 
           const server =
             await getServerSubscription();
@@ -1014,15 +1007,11 @@
 
           if (!confirmed) {
             throw new Error(
-              "El servidor no confirmó " +
-              "la selección."
+              "El servidor no confirmó la selección."
             );
           }
 
-          state.selected = new Set(
-            savedIds
-          );
-
+          state.selected = new Set(savedIds);
           state.dirty = false;
 
           renderCenters();
@@ -1030,14 +1019,81 @@
           status.textContent =
             `Preferencias guardadas: ` +
             `${savedIds.length} establecimiento(s).`;
-
         } catch (error) {
           state.dirty = true;
 
           status.textContent =
             "No se pudo confirmar el guardado: " +
             error.message;
+        } finally {
+          setBusy(false);
+        }
+      }
+    );
 
+    /*
+     * ENVÍO MANUAL DE PRUEBA
+     */
+
+    testButton.addEventListener(
+      "click",
+      async () => {
+        if (
+          state.busy ||
+          !state.registered ||
+          state.needsReconnect
+        ) {
+          return;
+        }
+
+        const confirmed = window.confirm(
+          "¿Querés enviar una notificación de " +
+          "prueba a este dispositivo?\n\n" +
+          "No se publicará ningún aviso oficial."
+        );
+
+        if (!confirmed) return;
+
+        setBusy(true);
+
+        status.textContent =
+          "Enviando notificación de prueba...";
+
+        try {
+          const result = await sendTest();
+
+          if (
+            result.ok &&
+            result.accepted
+          ) {
+            status.textContent =
+              "El servicio Push aceptó la prueba. " +
+              "Comprobá si aparece una notificación " +
+              "de Alerta Salud en Chrome o Windows.";
+          } else {
+            throw new Error(
+              "No se confirmó el envío."
+            );
+          }
+        } catch (error) {
+          let message = error.message;
+
+          if (error.code === "TEST_RATE_LIMIT") {
+            message =
+              "Ya se solicitó una prueba. " +
+              "Esperá al menos 2 minutos.";
+          }
+
+          if (error.code === "PUSH_REJECTED") {
+            message =
+              "El servicio Push rechazó la prueba" +
+              (error.pushStatus
+                ? ` (HTTP ${error.pushStatus}).`
+                : ".");
+          }
+
+          status.textContent =
+            "Prueba no completada: " + message;
         } finally {
           setBusy(false);
         }
@@ -1045,6 +1101,7 @@
     );
 
     setMode("vigentes");
+    updateTestVisibility();
     setBusy(false);
   }
 
