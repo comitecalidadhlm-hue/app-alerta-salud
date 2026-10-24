@@ -1,7 +1,7 @@
 
 /*
- * APP ALERTA SALUD V1.9.6
- * Configuracion y carga de modulos.
+ * APP ALERTA SALUD V1.10.0
+ * Configuración y carga de módulos
  */
 
 window.ALERTA_SUPABASE = Object.freeze({
@@ -10,17 +10,31 @@ window.ALERTA_SUPABASE = Object.freeze({
     "sb_publishable_wnu8PccuNZ0aQuEDAEad3Q_6IxzErlh"
 });
 
+/*
+ * Configuración Web Push.
+ *
+ * Completar en la siguiente etapa:
+ * - publicKey: clave VAPID pública
+ * - subscriptionEndpoint: URL HTTPS del backend
+ *
+ * Nunca colocar claves privadas aquí.
+ */
+
+window.ALERTA_PUSH = Object.freeze({
+  publicKey: "",
+  subscriptionEndpoint: ""
+});
+
 document.addEventListener(
   "DOMContentLoaded",
   () => {
     const modules = [
       "./institucional.js",
       "./notificaciones.js",
+      "./push.js",
       "./navegacion.js"
     ];
 
-    // Carga secuencial para que navegación
-    // encuentre los módulos ya construidos.
     function loadNext(index) {
       if (index >= modules.length) return;
 
