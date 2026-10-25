@@ -776,15 +776,21 @@
 
     const warning = node(
       "div",
-      "IMPORTANTE: esta función publica información " +
-      "real para la población. No la utilices para " +
-      "realizar pruebas.",
+      "Seleccioná primero el modo de trabajo. SIMULACIÓN no publica " +
+      "ni envía mensajes. PUBLICACIÓN REAL requiere doble confirmación.",
       "as-warning"
     );
 
     content.append(warning);
 
     const form = node("form");
+    const mode = selectField("Modo de trabajo", [
+      ["simulacion", "SIMULACIÓN — sin publicar ni enviar"],
+      ["real", "PUBLICACIÓN REAL — requiere doble confirmación"]
+    ]);
+    mode.input.value = "simulacion";
+    form.append(mode.wrapper);
+
 
     const type = selectField(
       "Tipo de cambio",
@@ -1066,88 +1072,87 @@
         );
       }
 
-      box.append(
-        node(
-          "div",
-          "Al confirmar, esta información se " +
-          "publicará inmediatamente y quedará " +
-          "registrada bajo tu identidad.",
-          "as-warning"
-        )
-      );
+      const isReal = mode.input.value === "real";
+      const selectedMode = mode.input.value;
+      box.append(node("p", isReal
+        ? "MODO REAL: la publicación será visible para la población. " +
+          "El envío Push requiere habilitar el motor de distribución por separado."
+        : "SIMULACIÓN LOCAL: no se publica en Supabase ni se envía Push.",
+        "as-warning"));
 
-      const confirmButton = button(
-        "Confirmar publicación oficial",
-        async () => {
-          // Si se modificó el formulario después
-          // de la vista previa, no publicar datos
-          // distintos de los revisados.
-          const current = collectValues();
-
-          if (
-            JSON.stringify(current) !==
-            JSON.stringify(values)
-          ) {
-            notice(
-              "El formulario cambió después de la " +
-              "vista previa. Revisá nuevamente."
-            );
+      if (!isReal) {
+        box.append(
+          node("p", "DEMOSTRACIÓN · NO ES UNA EMERGENCIA REAL"),
+          button("Cerrar simulación", () => box.remove(), "as-secondary")
+        );
+      } else {
+        const firstCheck = node("input");
+        firstCheck.type = "checkbox";
+        firstCheck.id = "asRealConfirm1";
+        const firstLabel = node("label");
+        firstLabel.append(firstCheck, document.createTextNode(
+          " Confirmo que esta comunicación es REAL, no una simulación, " +
+          "y que revisé el establecimiento, contenido y vigencia."
+        ));
+        const secondArea = node("div");
+        secondArea.hidden = true;
+        const secondLabel = node("label", "Confirmación 2 de 2: escribí ENVIAR ALERTA REAL");
+        const secondInput = node("input");
+        secondInput.type = "text";
+        secondInput.autocomplete = "off";
+        secondInput.spellcheck = false;
+        secondLabel.append(secondInput);
+        const confirmButton = button("Autorizar publicación REAL", async () => {
+          if (mode.input.value !== selectedMode ||
+              JSON.stringify(collectValues()) !== JSON.stringify(values)) {
+            notice("Se modificó el modo o el formulario. Revisá nuevamente.");
             box.remove();
             return;
           }
-
-          if (
-            !window.confirm(
-              "¿CONFIRMÁS LA PUBLICACIÓN OFICIAL?\n\n" +
-              center + "\n" +
-              values.p_titulo + "\n\n" +
-              "La comunicación será visible para " +
-              "la población y quedará registrada " +
-              "bajo tu identidad."
-            )
-          ) {
+          if (!firstCheck.checked ||
+              secondInput.value.trim() !== "ENVIAR ALERTA REAL") {
+            notice("Debés completar ambas confirmaciones.");
             return;
           }
-
           confirmButton.disabled = true;
           previewButton.disabled = true;
-
           notice("Publicando comunicación oficial…");
-
           try {
-            const id = await rpc(
-              "as_publicar_notificacion_institucional",
-              values
-            );
-
+            const id = await rpc("as_publicar_notificacion_institucional", values);
             dashboard();
-
-            notice(
-              "Comunicación publicada correctamente.\n" +
-              "Identificador: " + id +
-              "\nLa publicación ya puede consultarse " +
-              "desde el Centro de Notificaciones."
-            );
-
+            notice("Comunicación oficial publicada. Identificador: " + id +
+              "\nLa distribución Push masiva no se inicia desde esta pantalla. " +
+              "Requiere autorización del motor de envíos de producción.");
           } catch (error) {
-            notice(
-              "No se pudo publicar: " + error.message
-            );
-
+            notice("No se pudo publicar: " + error.message);
             confirmButton.disabled = false;
             previewButton.disabled = false;
           }
-        }
-      );
-
-      box.append(
-        confirmButton,
-        button(
-          "Volver a editar",
-          () => box.remove(),
-          "as-secondary"
-        )
-      );
+        }, "as-danger");
+        confirmButton.disabled = true;
+        const continueButton = button("Continuar a confirmación 2 de 2", () => {
+          if (!firstCheck.checked) {
+            notice("Primero confirmá que no es una simulación.");
+            return;
+          }
+          if (mode.input.value !== selectedMode ||
+              JSON.stringify(collectValues()) !== JSON.stringify(values)) {
+            notice("El formulario cambió. Revisá nuevamente.");
+            box.remove();
+            return;
+          }
+          firstCheck.disabled = true;
+          continueButton.disabled = true;
+          secondArea.hidden = false;
+          secondInput.focus();
+        });
+        secondInput.addEventListener("input", () => {
+          confirmButton.disabled = secondInput.value.trim() !== "ENVIAR ALERTA REAL";
+        });
+        secondArea.append(secondLabel, confirmButton);
+        box.append(firstLabel, continueButton, secondArea);
+      }
+      box.append(button("Volver a editar", () => box.remove(), "as-secondary"));
 
       form.after(box);
 
