@@ -1,11 +1,11 @@
 
 /*
- * APP ALERTA SALUD V1.10.18
+ * APP ALERTA SALUD V1.10.19
  * Archivo: push.js
  *
  * Registro, reconexión y preferencias.
  * Prueba manual de Web Push.
- * Compatible con Worker V1.10.18.
+ * Compatible con Worker V1.10.19.
  *
  * Los envíos automáticos siguen deshabilitados.
  */
@@ -144,7 +144,7 @@
     return reg.pushManager.getSubscription();
   }
 
-  async function request(path, body) {
+  async function request(path, body, accessToken = null) {
     if (!configured()) {
       throw new Error(
         "El servicio Web Push no está configurado."
@@ -154,7 +154,8 @@
     const response = await fetch(API + path, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
       },
       body: JSON.stringify(body),
       credentials: "omit",
@@ -334,7 +335,24 @@
     }
   }
 
+  function adminToken() {
+    return window.AlertaSaludInstitucionalAuth?.getAccessToken?.() || null;
+  }
+
+  async function isTestAuthorized() {
+    const jwt = adminToken();
+    if (!jwt) return false;
+    try {
+      const result = await request("/test-auth", {}, jwt);
+      return result.ok === true && result.superadmin === true;
+    } catch { return false; }
+  }
+
   async function sendTest() {
+    const jwt = adminToken();
+    if (!jwt || !(await isTestAuthorized())) {
+      throw new Error("Solo el Superadmin activo puede emitir pruebas.");
+    }
     const credentials = readCredentials();
 
     if (!credentials) {
@@ -365,7 +383,7 @@
       );
     }
 
-    return request("/test-push", credentials);
+    return request("/test-push", credentials, jwt);
   }
 
   function mount() {
@@ -622,13 +640,19 @@
       testButton.disabled = value;
     }
 
-    function updateTestVisibility() {
-      const visible =
+    let permissionCheck = 0;
+    async function updateTestVisibility() {
+      const check = ++permissionCheck;
+      testButton.hidden = true;
+      testArea.hidden = true;
+      testButton.style.display = "none";
+      const eligible =
         state.registered &&
         !state.needsReconnect &&
         supported() &&
         Notification.permission === "granted";
-
+      if (!eligible || !(await isTestAuthorized()) || check !== permissionCheck) return;
+      const visible = true;
       testButton.hidden = !visible;
       testArea.hidden = !visible;
 
@@ -1100,6 +1124,7 @@
       }
     );
 
+    document.addEventListener("alerta:auth", updateTestVisibility);
     setMode("vigentes");
     updateTestVisibility();
     setBusy(false);
