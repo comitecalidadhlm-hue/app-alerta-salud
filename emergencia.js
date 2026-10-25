@@ -19,6 +19,7 @@
   let previousFocus = null;
   let lastRecords = [];
   let active = false;
+  let demoActive = false;
 
   const root = document.createElement("section");
   root.id = "asEmergencyOverlay";
@@ -29,6 +30,7 @@
   root.setAttribute("aria-labelledby", "asEmergencyTitle");
   root.setAttribute("aria-describedby", "asEmergencyDescription");
   root.innerHTML = `
+    <div id="asEmergencyDemoBanner" class="as-emergency-demo-banner" hidden>DEMOSTRACIÓN · NO ES UNA EMERGENCIA REAL · SIN ENVÍOS</div>
     <div class="as-emergency-shell">
       <header class="as-emergency-header">
         <div class="as-emergency-eyebrow">⚠ ALERTA SANITARIA CRÍTICA</div>
@@ -80,8 +82,10 @@
   };
   const pending = () => lastRecords.filter(item => !acknowledged(String(item.id)));
 
-  function show(item) {
-    if (!item || !isCurrent(item, Date.now())) return;
+  function show(item, demo = false) {
+    if (!item || (!demo && !isCurrent(item, Date.now()))) return;
+    demoActive = demo;
+    el("asEmergencyDemoBanner").hidden = !demo;
     currentId = String(item.id);
     if (!active) previousFocus = document.activeElement;
     active = true;
@@ -96,7 +100,8 @@
       "Publicado: " + (date && Number.isFinite(date.getTime()) ?
         date.toLocaleString("es-AR") : "Fecha no disponible") +
       (item.servicio_afectado ? " · Servicio: " + safe(item.servicio_afectado) : "");
-    next.hidden = pending().length <= 1;
+    next.hidden = demo || pending().length <= 1;
+    acknowledge.textContent = demo ? "Cerrar demostración" : "Entendido · Volver a la aplicación";
     root.hidden = false;
     document.documentElement.classList.add("as-emergency-active");
     document.body.classList.add("as-emergency-active");
@@ -108,6 +113,7 @@
     document.documentElement.classList.remove("as-emergency-active");
     document.body.classList.remove("as-emergency-active");
     active = false;
+    demoActive = false;
     currentId = null;
     if (previousFocus?.isConnected && typeof previousFocus.focus === "function") {
       previousFocus.focus({preventScroll:true});
@@ -116,6 +122,7 @@
   }
 
   function acknowledgeCurrent() {
+    if (demoActive) { hide(); return; }
     if (currentId) remember(currentId);
     const another = pending()[0];
     if (another) show(another);
@@ -157,14 +164,14 @@
       const rows = await response.json();
       if (!Array.isArray(rows)) throw new Error("Respuesta no válida");
       lastRecords = rows.filter(item => isCurrent(item, Date.now()));
-      if (active) {
+      if (active && !demoActive) {
         const stillCurrent = lastRecords.find(item => String(item.id) === currentId);
         if (!stillCurrent) {
           const another = pending()[0];
           if (another) show(another);
           else hide();
         }
-      } else {
+      } else if (!active) {
         const first = pending()[0];
         if (first) show(first);
       }
@@ -186,7 +193,42 @@
       if (event.data?.type === "AS_CRITICAL_PUSH") refresh();
     });
   }
-  window.AlertaSaludEmergencia = Object.freeze({ refresh });
+  async function demo() {
+    const auth = window.AlertaSaludInstitucionalAuth;
+    const jwt = auth?.getAccessToken?.();
+    if (!jwt || !auth?.isSuperadmin?.()) {
+      throw new Error("Iniciá sesión como Superadmin para usar el simulador.");
+    }
+    const endpoint = window.ALERTA_PUSH?.subscriptionEndpoint;
+    if (!endpoint) throw new Error("El servicio de autorización Push no está configurado.");
+    const response = await fetch(endpoint.replace(/\/$/, "") + "/test-auth", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + jwt
+      },
+      body: "{}",
+      cache: "no-store",
+      credentials: "omit"
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || result?.ok !== true || result?.superadmin !== true) {
+      throw new Error("El servidor no autorizó esta demostración.");
+    }
+    show({
+      id: "demo-local",
+      titulo: "Simulacro de alerta sanitaria",
+      centros_asistenciales: {nombre: "Establecimiento de demostración"},
+      descripcion: "Esta es una simulación local para comprobar la pantalla de emergencia. No existe una situación real asociada.",
+      indicaciones: "Verificá la legibilidad de los mensajes, la navegación y el botón para cerrar. No realices acciones asistenciales basadas en esta demostración.",
+      servicio_afectado: "Simulación técnica",
+      publicado_en: new Date().toISOString()
+    }, true);
+  }
+  document.addEventListener("alerta:auth", () => {
+    if (demoActive && !window.AlertaSaludInstitucionalAuth?.isSuperadmin?.()) hide();
+  });
+  window.AlertaSaludEmergencia = Object.freeze({ refresh, demo });
   refresh();
   setInterval(refresh, POLL_MS);
 })();
