@@ -556,6 +556,15 @@
         )
       );
 
+      section.append(
+        button("⚠ Simular alarma crítica", async () => {
+          try {
+            await window.AlertaSaludEmergencia.demo();
+          } catch (error) {
+            notice("No se pudo iniciar la demostración: " + error.message);
+          }
+        })
+      );
       content.append(section);
     }
 
