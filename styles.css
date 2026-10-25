@@ -46,3 +46,36 @@
 
 /* V1.8 — listado sanitario filtrable */
 .care-filter-row{display:grid;gap:6px;margin:12px 0}.care-filter-row label{font-size:12px;font-weight:750;color:#314e6a}.care-filter-row select{width:100%;min-height:43px;border:1px solid #b8ccdf;border-radius:10px;padding:9px;background:#fff;color:#173a59;font:inherit;font-size:13px}.care-summary{font-size:12px;color:#53677c;margin:8px 0}.care-item .care-tag{margin-bottom:8px}.care-item a{display:inline-block;margin-top:9px;font-size:13px;font-weight:700;color:#1266ba}.care-item p{line-height:1.45}.care-empty{font-size:13px;color:#53677c}
+
+
+/* APP ALERTA SALUD V1.10.20 — Modo emergencia global */
+.as-emergency[hidden] { display: none !important; }
+html.as-emergency-active, body.as-emergency-active { overflow: hidden !important; }
+.as-emergency {
+  position: fixed; inset: 0; z-index: 2147483000;
+  background: #050505; color: #fff;
+  overflow: auto; overscroll-behavior: contain;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.as-emergency * { box-sizing: border-box; }
+.as-emergency-shell { min-height: 100%; min-height: 100dvh; display: flex; flex-direction: column; }
+.as-emergency-header { background: #d9473e; color: #fff; padding: max(28px, env(safe-area-inset-top)) 24px 28px; }
+.as-emergency-eyebrow { font-size: .95rem; font-weight: 800; letter-spacing: .06em; }
+.as-emergency-header h1 { margin: 22px 0 12px; font-size: clamp(2rem, 7vw, 3.5rem); line-height: 1.13; overflow-wrap: anywhere; }
+.as-emergency-header p { margin: 0; font-size: 1.2rem; }
+.as-emergency-body { flex: 1; width: 100%; max-width: 760px; margin: 0 auto; padding: 30px 24px 16px; }
+.as-emergency-icon { font-size: 3rem; line-height: 1; margin-bottom: 15px; }
+.as-emergency-body h2 { margin: 0 0 14px; font-size: clamp(1.5rem, 5vw, 2.4rem); }
+.as-emergency-description { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 1.25rem; line-height: 1.5; }
+.as-emergency-instructions { margin: 26px 0; border-left: 5px solid #f46a61; padding: 12px 18px; background: #1d1d1d; border-radius: 5px; }
+.as-emergency-instructions h3 { font-size: 1.25rem; margin: 0 0 10px; }
+.as-emergency-instructions p { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 1.15rem; line-height: 1.55; margin: 0; }
+.as-emergency-meta, .as-emergency-disclaimer { font-size: .92rem; line-height: 1.5; color: #dedede; }
+.as-emergency-footer { position: sticky; bottom: 0; padding: 15px 24px max(18px, env(safe-area-inset-bottom)); background: #050505; display: grid; gap: 10px; }
+.as-emergency-footer button { width: 100%; max-width: 760px; margin: 0 auto; border: 0; border-radius: 100px; min-height: 52px; padding: 12px 18px; font: inherit; font-weight: 750; font-size: 1rem; cursor: pointer; }
+#asEmergencyAcknowledge { background: #f16b62; color: #101010; }
+#asEmergencyNext { background: #333; color: #fff; border: 1px solid #777; }
+.as-emergency button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+@media (min-width: 800px) {
+  .as-emergency-header { padding-left: max(24px, calc((100vw - 760px)/2)); padding-right: max(24px, calc((100vw - 760px)/2)); }
+}
