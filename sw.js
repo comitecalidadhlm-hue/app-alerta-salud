@@ -1,12 +1,12 @@
 
 /*
- * APP ALERTA SALUD V1.10.0
+ * APP ALERTA SALUD V1.10.20
  * Service Worker + Web Push
  */
 
 "use strict";
 
-const CACHE = "alerta-salud-v1-10-0";
+const CACHE = "alerta-salud-v1-10-20";
 
 const ASSETS = [
   "./",
@@ -19,6 +19,7 @@ const ASSETS = [
   "./notificaciones.js",
   "./navegacion.js",
   "./push.js",
+  "./emergencia.js",
   "./supabase-config.js",
   "./manifest.webmanifest",
   "./icon.svg"
@@ -159,19 +160,31 @@ self.addEventListener("push", event => {
       ? payload.tag.slice(0, 100)
       : "alerta-salud";
 
+  const isCritical = payload.prioridad === "critica";
   event.waitUntil(
-    self.registration.showNotification(title, {
+    (async () => {
+      if (isCritical) {
+        const clients = await self.clients.matchAll({
+          type: "window", includeUncontrolled: true
+        });
+        await Promise.all(clients.map(client =>
+          client.postMessage({type:"AS_CRITICAL_PUSH"})
+        ));
+      }
+      return self.registration.showNotification(title, {
       body,
       icon: "./icon.svg",
       badge: "./icon.svg",
       tag,
       renotify: false,
+      requireInteraction: isCritical,
       data: {
         url: destination.href,
         notification_id:
           payload.notification_id || null
       }
-    })
+      });
+    })()
   );
 });
 
