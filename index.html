@@ -55,81 +55,39 @@
              id="view-inicio"
              aria-labelledby="homeTitle">
 
-      <div class="hero">
-        <div class="hero-top">
-          <div>
-            <p class="eyebrow">PANEL COMUNITARIO</p>
-            <h1 id="homeTitle">Tu localidad</h1>
-
-            <button class="location-btn" id="changeLocation">
-              📍 <span id="heroLocation">Santa Rosa</span>
-              <span aria-hidden="true">⌄</span>
-            </button>
-          </div>
-
-          <span class="hero-symbol" aria-hidden="true">☀</span>
-        </div>
-
-        <div class="hero-weather">
-          <strong>--°</strong>
-          <div>
-            <b>Datos pendientes</b>
-            <small>
-              Se conectará una fuente meteorológica verificada
-            </small>
-          </div>
-        </div>
-
-        <div class="hero-metrics">
-          <span>Máx. --°</span>
-          <span>Mín. --°</span>
-          <span>Viento -- km/h</span>
-        </div>
+      <div class="as-home-heading">
+        <div><p class="eyebrow">PANEL DE SITUACIÓN SANITARIA</p><h1 id="homeTitle">Información que cuida</h1></div>
+        <button class="location-btn" id="changeLocation">📍 <span id="heroLocation">Santa Rosa</span> ⌄</button>
       </div>
 
-      <div class="section-title">
-        <h2>Estado de las alertas</h2>
-        <span class="chip neutral">Sin sincronización SMN</span>
-      </div>
+      <section id="asHomeCritical" class="as-home-critical" hidden aria-live="polite">
+        <span class="as-home-critical-icon">⚠</span>
+        <div><strong id="asHomeCriticalTitle">Comunicación prioritaria</strong><small id="asHomeCriticalDetail"></small></div>
+        <button type="button" id="asHomeCriticalGo" aria-label="Ver avisos prioritarios">›</button>
+      </section>
 
-      <article class="alert-card">
-        <div class="alert-symbol">⚡</div>
-        <div>
-          <p class="eyebrow">ALERTAS OFICIALES</p>
-          <h3>Fuente oficial pendiente de integrar</h3>
-          <p>
-            No podemos confirmar alertas vigentes hasta conectar
-            la fuente oficial.
-          </p>
-          <button class="text-link" data-view="alertas">
-            Ver información →
-          </button>
+      <section class="as-home-panel" aria-labelledby="asHomeCareTitle">
+        <div class="as-home-panel-title"><span>🏥</span><h2 id="asHomeCareTitle">Situación de los establecimientos</h2></div>
+        <p class="as-home-help" id="asHomeCareStatus">Consultando declaraciones institucionales…</p>
+        <div class="as-home-stats" id="asHomeStats" hidden>
+          <div class="as-home-stat good"><strong id="asHomeOperational">—</strong><small>Operativos</small></div>
+          <div class="as-home-stat warn"><strong id="asHomePartial">—</strong><small>Con restricciones</small></div>
+          <div class="as-home-stat bad"><strong id="asHomeSuspended">—</strong><small>Atención suspendida</small></div>
         </div>
-      </article>
+        <p class="as-home-unknown" id="asHomeUnknown"></p>
+        <button class="as-home-action" type="button" data-home-go="mapa">▧ <span>Ver establecimientos en el mapa</span> ›</button>
+      </section>
 
-      <article class="health-card">
-        <span class="health-icon">♥</span>
-        <div>
-          <p class="eyebrow">PREVENCIÓN SANITARIA</p>
-          <h3>Cuidados frente al calor</h3>
-          <p>
-            Consejos generales para proteger la salud de la comunidad.
-          </p>
-          <button class="text-link" data-view="salud">
-            Ver recomendaciones →
-          </button>
-        </div>
-      </article>
+      <section class="as-home-panel" aria-labelledby="asHomeNoticesTitle">
+        <div class="as-home-heading-row"><h2 id="asHomeNoticesTitle">Últimos avisos sanitarios</h2><button class="as-home-link" type="button" data-home-go="alertas">Ver todos ›</button></div>
+        <div id="asHomeNotices" class="as-home-notices" aria-live="polite">Consultando comunicaciones oficiales…</div>
+      </section>
 
-      <!--
-        V1.10.12
-        Se elimina "Accesos rápidos" porque duplicaba
-        las opciones de la navegación inferior.
-      -->
-
-      <div class="info-strip">
-        ℹ️ Los ejemplos educativos no representan alertas actuales.
+      <div class="as-home-tiles">
+        <section class="as-home-tile"><span aria-hidden="true">🌤️</span><h2>Alertas meteorológicas</h2><p>Información oficial del Servicio Meteorológico Nacional.</p><a href="https://www.smn.gob.ar/alertas" target="_blank" rel="noopener noreferrer">Consultar SMN ↗</a></section>
+        <section class="as-home-tile"><span aria-hidden="true">🛡️</span><h2>Qué hacer ante una emergencia</h2><p>Recomendaciones preventivas para la comunidad.</p><button type="button" data-home-go="salud">Ver recomendaciones ›</button></section>
       </div>
+      <p class="as-home-disclaimer">ℹ️ Los estados son declaraciones institucionales vigentes. La falta de registros no significa ausencia de riesgos ni disponibilidad asistencial. Ante una emergencia, utilizá los canales oficiales.</p>
 
     </section>
 
@@ -533,6 +491,7 @@
 <script src="./app.js" defer></script>
 <script src="./map.js" defer></script>
 <script src="./care.js" defer></script>
+<script src="./inicio.js" defer></script>
 <script src="./emergencia.js" defer></script>
 
 </body>
