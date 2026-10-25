@@ -79,3 +79,13 @@ html.as-emergency-active, body.as-emergency-active { overflow: hidden !important
 @media (min-width: 800px) {
   .as-emergency-header { padding-left: max(24px, calc((100vw - 760px)/2)); padding-right: max(24px, calc((100vw - 760px)/2)); }
 }
+
+
+/* V1.10.21 — Identificación permanente de simulación */
+.as-emergency-demo-banner {
+  position: sticky; top: 0; z-index: 2;
+  padding: 12px 18px; text-align: center;
+  color: #111; background: #ffe15a; border-bottom: 3px solid #111;
+  font-weight: 900; font-size: .95rem; letter-spacing: .02em;
+}
+.as-emergency-demo-banner[hidden] { display: none !important; }
