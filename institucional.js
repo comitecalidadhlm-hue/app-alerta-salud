@@ -1,6 +1,6 @@
 
 /*
- * APP ALERTA SALUD V1.9.7
+ * APP ALERTA SALUD V1.10.19
  * PANEL INSTITUCIONAL
  *
  * Funciones:
@@ -331,6 +331,15 @@
     content.replaceChildren();
   }
 
+  function notifyAuth() {
+    document.dispatchEvent(new Event("alerta:auth"));
+  }
+
+  window.AlertaSaludInstitucionalAuth = Object.freeze({
+    getAccessToken: () => (isSuperadmin() && token ? token : null),
+    isSuperadmin: () => Boolean(token && isSuperadmin())
+  });
+
   function logout() {
     token = null;
     user = null;
@@ -338,6 +347,7 @@
     centers = [];
     authorities = [];
     users = [];
+    notifyAuth();
     login();
   }
 
@@ -398,12 +408,14 @@
         user = session.user;
 
         await loadIdentity();
+        notifyAuth();
         dashboard();
 
       } catch (error) {
         token = null;
         user = null;
         profile = null;
+        notifyAuth();
 
         notice(
           "No se pudo ingresar: " + error.message
@@ -476,6 +488,7 @@
       button("Actualizar", async () => {
         try {
           await loadIdentity();
+          notifyAuth();
           dashboard();
         } catch (error) {
           notice(error.message);
@@ -1593,7 +1606,7 @@
   login();
 
   console.info(
-    "App Alerta Salud: panel institucional V1.9.7"
+    "App Alerta Salud: panel institucional V1.10.19"
   );
 
 })();
