@@ -1,12 +1,12 @@
 
 /*
- * APP ALERTA SALUD V1.10.20
+ * APP ALERTA SALUD V1.10.21
  * Service Worker + Web Push
  */
 
 "use strict";
 
-const CACHE = "alerta-salud-v1-10-20";
+const CACHE = "alerta-salud-v1-10-21";
 
 const ASSETS = [
   "./",
