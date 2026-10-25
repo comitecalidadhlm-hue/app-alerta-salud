@@ -1089,8 +1089,45 @@
             const id = await rpc("as_publicar_notificacion_institucional", values);
             dashboard();
             notice("Comunicación oficial publicada. Identificador: " + id +
-              "\nLa distribución Push masiva no se inicia desde esta pantalla. " +
-              "Requiere autorización del motor de envíos de producción.");
+              "\nEl envío Push NO se inició. Podés solicitarlo mediante la autorización adicional.");
+            const sendPanel = node("section", null, "as-panel");
+            sendPanel.append(node("h3", "Distribución Push — autorización independiente"));
+            sendPanel.append(node("p", "Esta operación es REAL. Solo solicitará la distribución; el Worker permanece sujeto a los controles de activación y destinatarios autorizados."));
+            const sendCheck = node("input");
+            sendCheck.type = "checkbox";
+            const sendLabel = node("label");
+            sendLabel.append(sendCheck, document.createTextNode(" Confirmo que deseo solicitar el envío Push REAL del aviso publicado."));
+            const sendText = node("input");
+            sendText.type = "text";
+            sendText.placeholder = "Escribí AUTORIZAR PUSH REAL";
+            sendText.autocomplete = "off";
+            const sendButton = button("Solicitar distribución Push REAL", async () => {
+              if (!sendCheck.checked || sendText.value.trim() !== "AUTORIZAR PUSH REAL") {
+                notice("La distribución requiere confirmación expresa.");
+                return;
+              }
+              sendButton.disabled = true;
+              try {
+                const endpoint = String(window.ALERTA_PUSH?.subscriptionEndpoint || "").replace(/\/+$/, "");
+                if (!endpoint || !token) throw Error("No está disponible el servicio Push o la sesión institucional.");
+                const response = await fetch(endpoint + "/official/queue", {
+                  method: "POST",
+                  headers: {"Authorization": "Bearer " + token, "Content-Type": "application/json"},
+                  body: JSON.stringify({notificationId: id}),
+                  cache: "no-store"
+                });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) throw Error(result.error || "Error HTTP " + response.status);
+                notice("Solicitud registrada. Identificador: " + (result.distributionId || "sin identificar") +
+                  "\nEl registro en cola no equivale a recepción en los dispositivos.");
+                sendPanel.remove();
+              } catch (error) {
+                notice("No se pudo solicitar el envío Push: " + error.message);
+                sendButton.disabled = false;
+              }
+            }, "as-danger");
+            sendPanel.append(sendLabel, sendText, sendButton);
+            content.prepend(sendPanel);
           } catch (error) {
             notice("No se pudo publicar: " + error.message);
             confirmButton.disabled = false;
