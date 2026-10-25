@@ -476,107 +476,75 @@
   function dashboard() {
     screen("Panel institucional");
 
-    notice(
-      `${profile?.nombre || user?.email || "Usuario"}\n` +
-      "Las publicaciones oficiales requieren una " +
-      "habilitación institucional vigente."
-    );
+    const own = authorities.filter(activeAuthority);
+    const superadmin = isSuperadmin();
+    notice(`${profile?.nombre || user?.email || "Usuario"}\n` +
+      (superadmin
+        ? "Superadmin: gestión y publicación para todos los establecimientos. Cada publicación requiere autorización del servidor."
+        : "Las publicaciones oficiales requieren una habilitación institucional vigente."));
 
     const actions = node("div", null, "as-actions");
-
     actions.append(
       button("Actualizar", async () => {
-        try {
-          await loadIdentity();
-          notifyAuth();
-          dashboard();
-        } catch (error) {
-          notice(error.message);
-        }
+        try { await loadIdentity(); notifyAuth(); dashboard(); }
+        catch (error) { notice(error.message); }
       }),
-      button(
-        "Cerrar sesión",
-        logout,
-        "as-secondary"
-      )
+      button("Cerrar sesión", logout, "as-secondary")
     );
-
     content.append(actions);
 
-    const own = authorities.filter(activeAuthority);
+    const publicationSection = node("section", null, "as-card");
+    publicationSection.append(node("h3", "Publicaciones institucionales"));
 
-    if (own.length) {
-      const section = node("section", null, "as-card");
-
-      section.append(
-        node("h3", "Publicaciones institucionales")
-      );
-
+    if (superadmin) {
+      publicationSection.append(node("p",
+        "Seleccioná el establecimiento. La simulación no publica ni envía avisos; la publicación real exige doble confirmación."));
+      const availableCenters = centers.filter(c => c.activo === true);
+      if (!availableCenters.length) {
+        publicationSection.append(node("p", "No se encontraron establecimientos activos.", "as-muted"));
+      } else {
+        const options = availableCenters.map(c => [String(c.id), c.nombre]);
+        const selected = selectField("Establecimiento", options);
+        publicationSection.append(selected.wrapper);
+        const chosenAuthority = () => ({ centro_id: Number(selected.input.value),
+          tipo_autoridad: "superadmin", cargo: "Superadmin" });
+        const publicationActions = node("div", null, "as-actions");
+        publicationActions.append(
+          button("Crear aviso o alerta", () => notificationForm(chosenAuthority())),
+          button("Declarar estado operativo", () => declarationForm(chosenAuthority()), "as-secondary")
+        );
+        publicationSection.append(publicationActions);
+      }
+    } else if (own.length) {
       for (const authority of own) {
         const card = node("div", null, "as-card");
-
         card.append(
           node("h3", centerName(authority.centro_id)),
-          node(
-            "p",
-            authority.tipo_autoridad === "direccion"
-              ? "Dirección"
-              : "Comité de Crisis"
-          ),
+          node("p", authority.tipo_autoridad === "direccion" ? "Dirección" : "Comité de Crisis"),
           node("p", authority.cargo),
-          button(
-            "Declarar estado operativo",
-            () => declarationForm(authority)
-          ),
-          button(
-            "🔔 Publicar novedad",
-            () => notificationForm(authority)
-          )
+          button("Declarar estado operativo", () => declarationForm(authority)),
+          button("Crear aviso o alerta", () => notificationForm(authority))
         );
-
-        section.append(card);
+        publicationSection.append(card);
       }
-
-      content.append(section);
+    } else {
+      publicationSection.append(node("p",
+        "No tenés establecimientos habilitados para realizar publicaciones oficiales.", "as-muted"));
     }
+    content.append(publicationSection);
 
-    if (isSuperadmin()) {
+    if (superadmin) {
       const section = node("section", null, "as-card");
-
       section.append(
         node("h3", "Administración de autoridades"),
-        node(
-          "p",
-          "Registrar, consultar y revocar " +
-          "designaciones institucionales."
-        ),
-        button(
-          "Gestionar autoridades",
-          authoritiesAdmin
-        )
-      );
-
-      section.append(
+        node("p", "Registrar, consultar y revocar designaciones institucionales."),
+        button("Gestionar autoridades", authoritiesAdmin),
         button("⚠ Simular alarma crítica", async () => {
-          try {
-            await window.AlertaSaludEmergencia.demo();
-          } catch (error) {
-            notice("No se pudo iniciar la demostración: " + error.message);
-          }
+          try { await window.AlertaSaludEmergencia.demo(); }
+          catch (error) { notice("No se pudo iniciar la demostración: " + error.message); }
         })
       );
       content.append(section);
-    }
-
-    if (!own.length && !isSuperadmin()) {
-      content.append(
-        node(
-          "p",
-          "No tenés establecimientos habilitados " +
-          "para realizar publicaciones oficiales.",
-          "as-muted"
-        )
-      );
     }
   }
 
