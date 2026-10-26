@@ -426,7 +426,7 @@
     const centers = new Map();
 
     for (const item of records) {
-      if (item.centro_id) {
+      if (item.centro_id && (!$("asNotOnlyLocal").checked || centerLocality(item) === api.getLocalidad())) {
         centers.set(
           String(item.centro_id),
           centerName(item)
@@ -611,7 +611,6 @@
 
       if (
         onlyLocal &&
-        item.centro_id &&
         centerLocality(item) !== locality
       ) {
         return false;
@@ -853,7 +852,7 @@
   document.addEventListener(
     "alerta:localidad",
     () => {
-      if (loaded) render();
+      if (loaded) { updateCenterOptions(); render(); }
     }
   );
 
