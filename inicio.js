@@ -290,7 +290,7 @@
           notice.centros_asistenciales?.localidad;
 
         return isCurrent(notice) &&
-          (!noticeCity || noticeCity === city);
+          noticeCity === city;
       });
 
       const container = $('asHomeNotices');
