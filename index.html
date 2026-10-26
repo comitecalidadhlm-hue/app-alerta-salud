@@ -99,21 +99,51 @@
              id="view-alertas"
              aria-labelledby="alertsTitle">
 
-      <h1 id="alertsTitle">Alertas y avisos sanitarios</h1>
-      <p class="subtitle">Comunicaciones para <b class="current-location">Santa Rosa</b></p>
+      <h1 id="alertsTitle">Alertas oficiales</h1>
 
-      <div class="paper">
-        <h2>Avisos institucionales vigentes</h2>
-        <p>Comunicaciones publicadas por las autoridades habilitadas de los establecimientos. Seleccioná un aviso para leer su contenido.</p>
-        <div id="asInstitutionalAlerts" role="status">Consultando comunicaciones institucionales…</div>
+      <p class="subtitle">
+        Estado de las advertencias para
+        <b class="current-location">Santa Rosa</b>
+      </p>
+
+      <div class="empty">
+        <span>🛡️</span>
+        <h2>Consulta de alertas</h2>
+        <p>
+          La consulta a la base de datos se iniciará al abrir
+          la aplicación. Esto no sustituye los avisos oficiales.
+        </p>
+        <a href="https://www.smn.gob.ar/alertas"
+           target="_blank"
+           rel="noopener noreferrer">
+          Consultar alertas del SMN ↗
+        </a>
       </div>
 
       <div class="paper">
-        <h2>Advertencias de fuentes externas</h2>
-        <p>Información diferenciada de los avisos institucionales. La integración automática con el Servicio Meteorológico Nacional todavía no está verificada.</p>
-        <p><a href="https://www.smn.gob.ar/alertas" target="_blank" rel="noopener noreferrer">Consultar alertas oficiales del SMN ↗</a></p>
-        <p><b>Estado de la integración:</b> <span id="sourceStatus">Sin sincronización automática configurada.</span><br><small id="sourceUpdated">No hay fecha de última actualización verificada.</small></p>
-        <div id="dbAlerts" role="status">Consultando advertencias registradas…</div>
+        <b>Estado de la integración:</b>
+        <span id="sourceStatus">
+          Sin sincronización automática configurada.
+        </span>
+        <br>
+        <small id="sourceUpdated">
+          No hay fecha de última actualización verificada.
+        </small>
+      </div>
+
+      <div id="dbAlerts" class="paper" role="status">
+        Consultando base de datos…
+      </div>
+
+      <h2>¿Cómo funcionará?</h2>
+
+      <div class="paper">
+        <p>
+          Las alertas verificadas mostrarán fuente,
+          localidad afectada, nivel, fecha de emisión
+          y vigencia. La publicación automática se habilitará
+          luego de validar la integración.
+        </p>
       </div>
 
     </section>
@@ -370,23 +400,23 @@
     <button class="nav-item active"
             data-view="inicio"
             aria-current="page">
-      <span>⌂</span>Inicio
+      <span class="as-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7"/><path d="M5 9v12h14V9"/><path d="M9 21v-7h6v7"/></svg></span><span class="as-nav-label">Inicio</span>
     </button>
 
     <button class="nav-item" data-view="mapa">
-      <span>▧</span>Mapa
+      <span class="as-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/></svg></span><span class="as-nav-label">Mapa</span>
     </button>
 
     <button class="nav-item" data-view="alertas">
-      <span>♧</span>Alertas
+      <span class="as-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg></span><span class="as-nav-label">Alertas</span>
     </button>
 
     <button class="nav-item" data-view="salud">
-      <span>♥</span>Salud
+      <span class="as-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z"/></svg></span><span class="as-nav-label">Salud</span>
     </button>
 
     <button class="nav-item" data-view="mas">
-      <span>☰</span>Más
+      <span class="as-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></span><span class="as-nav-label">Más</span>
     </button>
 
   </nav>
