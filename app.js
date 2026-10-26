@@ -38,20 +38,62 @@ async function loadLocalidades(){
  }catch(error){console.warn('Localidades: no se pudo consultar Supabase',error)}
 }
 async function loadAlertas(){
- renderDbMessage('Consultando alertas publicadas y vigentes…');
+ const institution=$('asInstitutionalAlerts');
+ const meteorological=$('dbAlerts');
+ if(institution)institution.textContent='Consultando comunicaciones institucionales…';
+ if(meteorological)meteorological.textContent='Consultando advertencias registradas…';
+ const current=place;
+ const isValid=a=>{
+  const start=a.vigente_desde?Date.parse(a.vigente_desde):0;
+  const end=a.vigente_hasta?Date.parse(a.vigente_hasta):Infinity;
+  return (start===0||Number.isFinite(start)&&start<=Date.now()) && (end===Infinity||Number.isFinite(end)&&end>Date.now());
+ };
+ const formatDate=value=>value&&Number.isFinite(Date.parse(value))?new Date(value).toLocaleString('es-AR'):'No informada';
+ try{
+  const notices=await fetchPublic('as_notificaciones',
+   'select=id,centro_id,titulo,descripcion,indicaciones,prioridad,publicado_en,vigente_desde,vigente_hasta,centros_asistenciales(nombre,localidad)'+
+   '&publicado=eq.true&es_prueba=eq.false&order=publicado_en.desc&limit=200');
+  if(current!==place)return;
+  if(institution){
+   institution.replaceChildren();
+   const visible=notices.filter(a=>isValid(a)&&(!a.centros_asistenciales?.localidad||a.centros_asistenciales.localidad===current));
+   if(!visible.length)institution.textContent='No hay avisos institucionales vigentes registrados para esta localidad. Esto no garantiza ausencia de novedades.';
+   visible.forEach(a=>{
+    const article=document.createElement('article');article.className='as-alert-detail';
+    article.style.cssText='padding:12px 0;border-bottom:1px solid #d7e1ea';
+    const button=document.createElement('button');button.type='button';
+    button.style.cssText='width:100%;text-align:left;background:transparent;border:0;padding:4px 0;color:inherit;cursor:pointer';
+    button.setAttribute('aria-expanded','false');
+    const title=document.createElement('strong');title.textContent=a.titulo||'Comunicación institucional';
+    const meta=document.createElement('small');meta.style.cssText='display:block;margin-top:5px';
+    meta.textContent=[a.centros_asistenciales?.nombre||'Institución',formatDate(a.publicado_en),'Prioridad: '+(a.prioridad||'No indicada')].join(' · ');
+    const indicator=document.createElement('span');indicator.textContent='  ▾';
+    button.append(title,indicator,meta);
+    const detail=document.createElement('div');detail.hidden=true;detail.style.cssText='padding:8px 0 4px;white-space:pre-wrap;overflow-wrap:anywhere';
+    const add=(label,value)=>{if(!value)return;const line=document.createElement('p');const bold=document.createElement('strong');bold.textContent=label+': ';line.append(bold,document.createTextNode(String(value)));detail.append(line)};
+    add('Descripción',a.descripcion);add('Indicaciones',a.indicaciones);add('Vigente hasta',a.vigente_hasta?formatDate(a.vigente_hasta):'Sin vencimiento informado');
+    button.addEventListener('click',()=>{detail.hidden=!detail.hidden;button.setAttribute('aria-expanded',String(!detail.hidden));indicator.textContent=detail.hidden?'  ▾':'  ▴'});
+    article.append(button,detail);institution.append(article);
+   });
+  }
+ }catch(error){if(institution)institution.textContent='No fue posible verificar los avisos institucionales. Intentá actualizar la aplicación.';console.warn('Avisos institucionales:',error)}
  try{
   const data=await fetchPublic('alertas','select=titulo,descripcion,tipo,nivel,inicio,fin,localidad_id,url_fuente,fuentes_oficiales(nombre),localidades(nombre)&estado=eq.publicada&order=inicio.desc&limit=50');
-  const matching=data.filter(a=>!a.localidad_id||a.localidades?.nombre===place);
-  const node=$('dbAlerts');node.replaceChildren();
-  if(!matching.length){renderDbMessage('No hay alertas publicadas para esta localidad en nuestra base de datos. Esto NO significa que no existan alertas oficiales. Consultá el SMN.');return;}
+  if(current!==place)return;
+  const matching=data.filter(a=>(!a.localidad_id||a.localidades?.nombre===current)&&(!a.fin||Date.parse(a.fin)>Date.now()));
+  if(!meteorological)return;
+  meteorological.replaceChildren();
+  if(!matching.length){meteorological.textContent='No hay advertencias externas vigentes registradas para esta localidad. Consultá siempre las fuentes oficiales.';return}
   matching.forEach(a=>{
    const article=document.createElement('article');article.style.cssText='padding:12px 0;border-bottom:1px solid #d7e1ea';
-   const heading=document.createElement('h3');heading.textContent=`${a.tipo==='oficial'?'Alerta oficial registrada':'Aviso preventivo'} · ${a.titulo}`;
+   const heading=document.createElement('h3');heading.textContent=(a.tipo==='oficial'?'Alerta oficial registrada':'Aviso preventivo')+' · '+a.titulo;
    const detail=document.createElement('p');detail.textContent=a.descripcion;
-   const meta=document.createElement('small');meta.textContent=`Nivel: ${a.nivel} · Inicio: ${new Date(a.inicio).toLocaleString('es-AR')} · Fuente: ${a.fuentes_oficiales?.nombre||'No identificada'}`;
-   article.append(heading,detail,meta);if(a.url_fuente){try{const u=new URL(a.url_fuente);if(u.protocol==='https:'){const link=document.createElement('a');link.href=u.href;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Ver aviso original ↗';article.append(document.createElement('br'),link)}}catch{}}node.append(article);
+   const meta=document.createElement('small');meta.textContent='Nivel: '+a.nivel+' · Inicio: '+formatDate(a.inicio)+' · Fuente: '+(a.fuentes_oficiales?.nombre||'No identificada');
+   article.append(heading,detail,meta);
+   if(a.url_fuente){try{const u=new URL(a.url_fuente);if(u.protocol==='https:'){const link=document.createElement('a');link.href=u.href;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Ver aviso original ↗';article.append(document.createElement('br'),link)}}catch{}}
+   meteorological.append(article);
   });
- }catch(error){renderDbMessage('No se pudo consultar Supabase. Verificá la conexión y consultá directamente las fuentes oficiales.');console.warn(error)}
+ }catch(error){if(meteorological)meteorological.textContent='No se pudieron verificar las advertencias externas. Consultá las fuentes oficiales.';console.warn('Alertas externas:',error)}
 }
 async function loadSourceStatus(){
  const status=$('sourceStatus'),updated=$('sourceUpdated');
@@ -64,6 +106,7 @@ async function loadSourceStatus(){
 }
 loadLocalidades().then(loadAlertas);loadSourceStatus();
 $('locationDialog').addEventListener('close',()=>{if($('locationDialog').returnValue==='save')loadAlertas()});
+document.addEventListener('alerta:view',event=>{if(event.detail?.view==='alertas')loadAlertas()});
 
 window.AlertaSalud={fetchPublic,getLocalidad:()=>place,seleccionarLocalidad:nombre=>{const select=$('localidad');if(![...select.options].some(o=>o.value===nombre))return false;place=nombre;try{localStorage.setItem('alertaSalud.localidad',place)}catch{}updatePlace();loadAlertas();return true}};
 if('serviceWorker'in navigator&&location.protocol!=='file:')window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
