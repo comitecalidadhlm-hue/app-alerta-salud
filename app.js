@@ -1,7 +1,6 @@
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
-const places=[...$('localidad').options].map(o=>o.value);
-let place='Santa Rosa';try{const saved=localStorage.getItem('alertaSalud.localidad');if(places.includes(saved))place=saved}catch{}
+let place='Santa Rosa';try{const saved=localStorage.getItem('alertaSalud.localidad');if(saved && saved.length<150)place=saved}catch{}
 function updatePlace(){document.querySelectorAll('.current-location').forEach(el=>el.textContent=place);$('heroLocation').textContent=place;$('localidad').value=place;document.dispatchEvent(new CustomEvent('alerta:localidad',{detail:{nombre:place}}));}updatePlace();
 function show(view){if(!$('view-'+view))return;document.querySelectorAll('.view').forEach(el=>el.classList.toggle('active',el.id==='view-'+view));document.querySelectorAll('.nav-item').forEach(el=>{const active=el.dataset.view===view;el.classList.toggle('active',active);if(active)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current')});window.scrollTo({top:0,behavior:'instant'});document.dispatchEvent(new CustomEvent('alerta:view',{detail:{view}}));}
 document.querySelectorAll('[data-view]').forEach(el=>el.addEventListener('click',()=>show(el.dataset.view)));
@@ -33,7 +32,7 @@ async function loadLocalidades(){
   if(!Array.isArray(data)||!data.length)return;
   const select=$('localidad');select.replaceChildren();
   data.forEach(item=>{const option=document.createElement('option');option.value=item.nombre;option.textContent=`${item.nombre} (${item.provincia})`;select.append(option)});
-  if(!data.some(item=>item.nombre===place))place=data[0].nombre;
+  if(!data.some(item=>item.nombre===place))place=data.some(item=>item.nombre==='Santa Rosa')?'Santa Rosa':data[0].nombre;
   updatePlace();
  }catch(error){console.warn('Localidades: no se pudo consultar Supabase',error)}
 }
@@ -56,7 +55,7 @@ async function loadAlertas(){
   if(current!==place)return;
   if(institution){
    institution.replaceChildren();
-   const visible=notices.filter(a=>isValid(a)&&(!a.centros_asistenciales?.localidad||a.centros_asistenciales.localidad===current));
+   const visible=notices.filter(a=>isValid(a)&&a.centros_asistenciales?.localidad===current);
    if(!visible.length)institution.textContent='No hay avisos institucionales vigentes registrados para esta localidad. Esto no garantiza ausencia de novedades.';
    visible.forEach(a=>{
     const article=document.createElement('article');article.className='as-alert-detail';
@@ -107,6 +106,7 @@ async function loadSourceStatus(){
 loadLocalidades().then(loadAlertas);loadSourceStatus();
 $('locationDialog').addEventListener('close',()=>{if($('locationDialog').returnValue==='save')loadAlertas()});
 document.addEventListener('alerta:view',event=>{if(event.detail?.view==='alertas')loadAlertas()});
+document.addEventListener('alerta:localidad',()=>loadAlertas());
 
 window.AlertaSalud={fetchPublic,getLocalidad:()=>place,seleccionarLocalidad:nombre=>{const select=$('localidad');if(![...select.options].some(o=>o.value===nombre))return false;place=nombre;try{localStorage.setItem('alertaSalud.localidad',place)}catch{}updatePlace();loadAlertas();return true}};
 if('serviceWorker'in navigator&&location.protocol!=='file:')window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
