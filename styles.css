@@ -304,3 +304,22 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 @media(prefers-reduced-motion:reduce) {
   .bottom-nav .nav-item .as-nav-icon { transition:none; }
 }
+
+/* V1.11.2 — Barra inferior: iconos vectoriales controlados, sin desbordes */
+.bottom-nav{height:calc(72px + env(safe-area-inset-bottom)) !important; min-height:72px; padding:5px 6px calc(5px + env(safe-area-inset-bottom)) !important; display:flex !important; align-items:stretch !important; gap:3px !important; overflow:visible !important; background:#fff !important; border-top:1px solid #dce8f2; z-index:60;}
+.bottom-nav .nav-item{position:relative; flex:1 1 0 !important; width:0; min-width:0 !important; min-height:0 !important; max-height:60px; display:flex !important; flex-direction:column !important; justify-content:center !important; align-items:center !important; gap:3px !important; padding:4px 1px !important; margin:0 !important; border:0; border-radius:12px !important; background:transparent !important; color:#536f89; font-size:11px !important; line-height:1.1 !important; cursor:pointer;}
+.bottom-nav .nav-item .as-nav-icon{box-sizing:border-box; flex:0 0 31px !important; display:flex !important; justify-content:center !important; align-items:center !important; width:42px !important; height:31px !important; min-height:31px !important; max-height:31px !important; padding:3px !important; margin:0 !important; border-radius:11px; background:transparent; font-size:0 !important; line-height:0 !important; overflow:hidden !important;}
+.bottom-nav .nav-item .as-nav-icon svg{display:block !important; position:static !important; flex:none !important; width:24px !important; height:24px !important; min-width:24px !important; min-height:24px !important; max-width:24px !important; max-height:24px !important; overflow:visible; stroke:currentColor;}
+.bottom-nav .nav-item .as-nav-label{display:block !important; flex:none !important; width:auto !important; height:auto !important; margin:0 !important; padding:0 !important; font-size:11px !important; line-height:14px !important; font-weight:600; white-space:nowrap;}
+.bottom-nav .nav-item[data-view="inicio"] .as-nav-icon{color:#087bea}
+.bottom-nav .nav-item[data-view="mapa"] .as-nav-icon{color:#009b91}
+.bottom-nav .nav-item[data-view="alertas"] .as-nav-icon{color:#dc8b00}
+.bottom-nav .nav-item[data-view="salud"] .as-nav-icon{color:#ed4258}
+.bottom-nav .nav-item[data-view="mas"] .as-nav-icon{color:#577590}
+.bottom-nav .nav-item.active,.bottom-nav .nav-item[aria-current="page"]{background:#e8f5ff !important; color:#075ca8 !important;}
+.bottom-nav .nav-item.active .as-nav-icon,.bottom-nav .nav-item[aria-current="page"] .as-nav-icon{background:linear-gradient(135deg,#d7f3ff,#c5e8ff) !important; color:#0575d5 !important;}
+.bottom-nav .nav-item.active .as-nav-label,.bottom-nav .nav-item[aria-current="page"] .as-nav-label{font-weight:800; color:#075ca8;}
+.bottom-nav .nav-item.active::after,.bottom-nav .nav-item[aria-current="page"]::after{content:""; position:absolute; top:-5px; left:30%; right:30%; height:3px; background:#0789eb; border-radius:0 0 5px 5px;}
+.bottom-nav .nav-item:focus-visible{outline:2px solid #0677d1; outline-offset:-2px;}
+@media(max-width:360px){.bottom-nav{gap:1px !important; padding-left:3px !important; padding-right:3px !important}.bottom-nav .nav-item .as-nav-label{font-size:10px !important}}
+@media(prefers-reduced-motion:reduce){.bottom-nav .nav-item,.bottom-nav .as-nav-icon{transition:none !important}}
