@@ -92,3 +92,145 @@ html.as-emergency-active, body.as-emergency-active { overflow: hidden !important
 
 /* V1.10.22 — Inicio Inteligente, compacto y adaptable */
 .as-home-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:12px 0 16px}.as-home-heading h1{font-size:1.3rem;margin:2px 0}.as-home-heading .location-btn{font-size:.82rem}.as-home-panel{background:#fff;border:1px solid #d8e3ed;border-radius:15px;padding:14px;margin:12px 0;box-shadow:0 3px 12px #112e4510}.as-home-panel-title,.as-home-heading-row{display:flex;align-items:center;gap:10px}.as-home-panel-title>span{font-size:1.5rem}.as-home-panel h2,.as-home-tile h2{font-size:1rem;line-height:1.3;margin:0}.as-home-help,.as-home-unknown{color:#506276;font-size:.82rem;margin:10px 0}.as-home-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:12px 0}.as-home-stats[hidden],.as-home-critical[hidden]{display:none!important}.as-home-stat{border-radius:11px;padding:12px 4px;text-align:center}.as-home-stat strong{display:block;font-size:1.65rem}.as-home-stat small{display:block;font-size:.7rem;line-height:1.2}.as-home-stat.good{background:#def6e9;color:#0a6442}.as-home-stat.warn{background:#fff1cd;color:#795000}.as-home-stat.bad{background:#ffe0df;color:#a71919}.as-home-action,.as-home-tile a,.as-home-tile button{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:0;border-radius:10px;padding:12px 10px;background:#e5f2ff;color:#0759a5;text-decoration:none;font-size:.85rem;font-weight:700;cursor:pointer}.as-home-action span{flex:1;text-align:left}.as-home-heading-row{justify-content:space-between;margin-bottom:10px}.as-home-link{background:none;border:0;color:#0759a5;font-weight:700;cursor:pointer}.as-home-notices{font-size:.83rem;color:#506276}.as-home-notice{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:#fff;border:1px solid #e5edf5;border-radius:10px;margin:7px 0;padding:12px 9px;cursor:pointer;color:#10243b}.as-home-notice-body{flex:1;min-width:0}.as-home-notice-body strong,.as-home-notice-body small{display:block;overflow-wrap:anywhere}.as-home-notice-body small{color:#607184;font-size:.73rem;margin-top:3px}.as-home-dot{width:11px;height:11px;flex:0 0 11px;border-radius:50%;background:#1b9c57}.as-home-dot.urgent{background:#ef9d10}.as-home-dot.critical{background:#d92f2f}.as-home-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}.as-home-tile{display:flex;flex-direction:column;gap:9px;background:#fff;border:1px solid #d8e3ed;border-radius:15px;padding:13px;min-width:0}.as-home-tile>span{font-size:1.8rem}.as-home-tile p{font-size:.78rem;color:#566b80;line-height:1.4;margin:0;flex:1}.as-home-tile a,.as-home-tile button{font-size:.77rem;padding:10px 5px}.as-home-disclaimer{font-size:.76rem;color:#586a7c;background:#e8f2fc;padding:12px;border-radius:10px;line-height:1.5}.as-home-critical{display:flex;align-items:center;gap:12px;background:#d93434;color:white;padding:15px;border-radius:13px;margin:12px 0}.as-home-critical-icon{font-size:2rem}.as-home-critical div{flex:1;min-width:0}.as-home-critical strong,.as-home-critical small{display:block}.as-home-critical small{margin-top:4px}.as-home-critical button{background:transparent;border:0;color:white;font-size:2rem;cursor:pointer}@media(max-width:360px){.as-home-tiles{gap:7px}.as-home-tile{padding:10px}.as-home-stat small{font-size:.63rem}}
+
+/* =============================================================
+   APP ALERTA SALUD V1.10.27 — Renovación visual global
+   Solo presentación. No modifica permisos, datos ni flujos Push.
+   ============================================================= */
+:root{--as-ink:#173047;--as-muted:#5e7286;--as-line:#dce6ee;--as-surface:#fff;--as-soft:#f4f8fb;--as-blue:#0867ae;--as-focus:#1278c4;color:var(--as-ink);background:#eaf0f5}
+body{font-family:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;color:var(--as-ink);-webkit-font-smoothing:antialiased}
+.shell{max-width:520px;background:var(--as-soft);box-shadow:0 10px 45px #19354c12}
+.top{min-height:68px;height:auto;padding:12px 17px;background:linear-gradient(115deg,#0b304e,#12587b);gap:12px}
+.brand{min-width:0}.brand strong{font-size:19px;letter-spacing:-.35px}.brand small{font-size:11px;line-height:1.4}.brand-icon{border-radius:11px;background:#ffffff20;border:1px solid #ffffff30;padding:6px 10px;font-size:22px}
+.icon-btn{min-width:42px;min-height:42px;border-radius:12px}
+.demo{padding:8px 14px;font-size:11px;line-height:1.4}
+main{padding:14px 13px 22px}
+.view>h1{font-size:23px;line-height:1.22;letter-spacing:-.4px}.view>h2{font-size:18px}
+.subtitle{font-size:12px;line-height:1.55;margin:5px 0 14px;color:var(--as-muted)}
+.as-home-heading{margin:6px 0 12px;align-items:center}.as-home-heading h1{font-size:21px;letter-spacing:-.4px}.as-home-heading .eyebrow{font-size:9px;color:#58748a}
+.location-btn{background:#e8f2f8;color:#155078;border:1px solid #cfe2ef;font-size:12px;min-height:36px;cursor:pointer}
+.as-home-panel,.as-home-tile,.paper,.empty,.advice,.menu-list{background:var(--as-surface);border:1px solid var(--as-line);border-radius:15px;box-shadow:0 2px 10px #173b5810}
+.as-home-panel{padding:13px;margin:10px 0}.as-home-panel h2,.as-home-tile h2{font-size:14px;line-height:1.35}
+.as-home-panel-title>span{font-size:21px}.as-home-help,.as-home-unknown{font-size:11px;line-height:1.5;margin:7px 0;color:var(--as-muted)}
+.as-home-stats{gap:7px;margin:9px 0}.as-home-stat{border-radius:11px;padding:10px 4px}.as-home-stat strong{font-size:23px;line-height:1.2}.as-home-stat small{font-size:10px;margin-top:4px}
+.as-home-action{padding:10px 11px;font-size:12px;min-height:40px}.as-home-heading-row{margin-bottom:7px}.as-home-link{font-size:11px}
+.as-home-notice{padding:10px;margin:6px 0;border-radius:10px}.as-home-notice-body strong{font-size:12px}.as-home-notice-body small{font-size:10px}
+.as-home-tiles{gap:9px;margin:10px 0}.as-home-tile{padding:12px;gap:7px}.as-home-tile>span{font-size:25px}.as-home-tile p{font-size:11px;line-height:1.45}.as-home-tile a,.as-home-tile button{font-size:11px;min-height:38px;padding:9px 6px}
+.as-home-disclaimer,.info-strip{font-size:11px;line-height:1.5;padding:11px 12px;border-radius:11px}
+.paper,.empty,.advice{padding:15px;margin:10px 0}.paper h2,.empty h2{font-size:17px;line-height:1.3}.paper p,.empty p{font-size:12px;line-height:1.6}
+.paper a,.text-link,.as-home-link{color:var(--as-blue)}
+.primary,.secondary{min-height:40px;padding:10px 13px;font-size:12px;border-radius:10px}.primary{background:var(--as-blue)}.secondary{background:#e8f2fa;color:#135584}
+button,input,select,textarea{font-family:inherit}button,a{-webkit-tap-highlight-color:transparent}button{touch-action:manipulation}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:3px solid var(--as-focus);outline-offset:2px}
+.bottom-nav{height:calc(66px + env(safe-area-inset-bottom));padding:3px 4px env(safe-area-inset-bottom);border-top:1px solid var(--as-line);box-shadow:0 -4px 20px #102c4610;background:#fff}
+.nav-item{min-width:0;border-radius:10px;color:#64788b;font-size:10px;line-height:1.15}.nav-item span{font-size:21px;margin-bottom:3px}.nav-item.active{background:#eaf4fb;color:#075eaa;font-weight:800}
+.map-controls{gap:8px}.map-place-list{gap:7px;margin:10px 0}.map-place-list button{font-size:11px;padding:10px 8px}
+.menu-list button,.menu-list a{padding:13px 14px;font-size:18px;min-height:52px}.menu-list span{font-size:13px}.menu-list small{font-size:10px}
+.top, .bottom-nav, .as-home-panel, .as-home-tile, .paper, .empty{overflow-wrap:anywhere}
+dialog:not(.as-emergency){border-radius:16px;padding:18px;max-height:88dvh;overflow:auto}dialog:not(.as-emergency)::backdrop{background:#071c31a8}
+@media(min-width:700px){.shell{margin:12px auto;min-height:calc(100dvh - 24px);border-radius:18px}.bottom-nav{bottom:0}}
+@media(max-width:380px){main{padding:11px 10px 18px}.as-home-panel{padding:11px}.as-home-tile{padding:10px}.as-home-stats{gap:5px}.as-home-stat small{font-size:9px}.brand strong{font-size:17px}}
+@media(prefers-reduced-motion:no-preference){.as-home-panel,.as-home-tile,.paper,.nav-item,.primary,.secondary{transition:background-color .18s ease,border-color .18s ease,box-shadow .18s ease}.as-home-notice:hover,.as-home-tile:hover{border-color:#a9cce3}.primary:hover{background:#075b99}}
+/* Los avisos de emergencia mantienen sus estilos propios y máxima prioridad. */
+
+
+/* ===========================================================
+   APP ALERTA SALUD V1.11.0 — IDENTIDAD INSTITUCIONAL VISUAL
+   Opción 2 + 4, estilo equilibrado. Solo capa de presentación.
+   No modifica emergencia, autenticación, permisos ni Web Push.
+   =========================================================== */
+:root {
+  --as-brand-navy:#0a3455;
+  --as-brand-blue:#086bb8;
+  --as-brand-teal:#087f88;
+  --as-brand-pale:#eaf5f8;
+  --as-ink:#18344c;
+  --as-muted:#546b80;
+  --as-line:#d8e5ee;
+  --as-surface:#fff;
+  --as-soft:#f2f7fb;
+  --as-blue:#086bb8;
+  --as-focus:#117dbf;
+}
+html { background:#e7eff5; }
+body { color:var(--as-ink); background:#e7eff5; }
+.shell { background:var(--as-soft); max-width:520px; box-shadow:0 10px 46px #0b3a5a20; }
+.top {
+  min-height:76px; padding:13px 16px;
+  background:linear-gradient(116deg,#083858 0%,#075c83 63%,#087f88 100%);
+  border-bottom:2px solid #19a6b0;
+}
+.brand { gap:10px; }
+.brand-icon { background:#fff; color:#08769a; border:0; border-radius:12px; font-size:23px; padding:7px 10px; box-shadow:0 3px 12px #041e352b; }
+.brand strong { font-size:20px; letter-spacing:-.45px; }
+.brand strong span { color:#a9f0eb; }
+.brand small { font-size:11px; color:#d6f0f3; }
+.icon-btn { background:#ffffff1f; border:1px solid #ffffff38; color:#fff; }
+.demo { background:#fff2cc; color:#604713; border-bottom:1px solid #e9d899; padding:8px 14px; }
+main { padding:13px 13px 24px; }
+.view>h1 { color:#103a5b; font-size:22px; letter-spacing:-.45px; margin:8px 0 5px; }
+.view>h2 { color:#103a5b; }
+.subtitle { color:var(--as-muted); }
+.as-home-heading { margin:3px 0 11px; }
+.as-home-heading .eyebrow { color:var(--as-brand-teal); letter-spacing:.8px; font-weight:800; }
+.as-home-heading h1 { color:#113e5f; font-size:21px; }
+.location-btn { border-radius:999px; border:1px solid #bcdbe8; background:#e5f4f7; color:#105b72; font-weight:750; }
+.as-home-panel,.as-home-tile,.paper,.empty,.advice,.menu-list,.care-directory {
+  background:#fff; border:1px solid var(--as-line); border-radius:16px;
+  box-shadow:0 4px 15px #1549680d;
+}
+.as-home-panel { margin:10px 0; padding:13px; }
+.as-home-panel-title { gap:9px; }
+.as-home-panel-title>span { display:grid; place-items:center; width:33px; height:33px; border-radius:10px; background:#e7f5f7; font-size:19px; }
+.as-home-panel h2,.as-home-tile h2 { color:#123b5b; font-size:14px; }
+.as-home-help,.as-home-unknown { color:#536b7d; }
+.as-home-stats { gap:7px; margin:9px 0; }
+.as-home-stat { border:1px solid transparent; padding:11px 3px; border-radius:12px; }
+.as-home-stat strong { font-size:24px; }
+.as-home-stat.good { background:#e3f7ee; border-color:#d1efdf; color:#087044; }
+.as-home-stat.warn { background:#fff5d9; border-color:#f7e9b7; color:#86600b; }
+.as-home-stat.bad { background:#ffebea; border-color:#f8d6d4; color:#a92c30; }
+.as-home-action,.as-home-tile a,.as-home-tile button {
+  background:#e7f3fd; color:#075a9e; border:1px solid #d5e8f7;
+  border-radius:11px; min-height:42px; font-weight:750;
+}
+.as-home-notice { background:#fff; border:1px solid #e1eaf1; border-radius:12px; padding:11px 10px; }
+.as-home-notice:hover { background:#f7fbfd; border-color:#acd6e8; }
+.as-home-notice-body strong { font-size:12px; color:#173b58; }
+.as-home-link { color:#076aa9; }
+.as-home-tiles { gap:9px; }
+.as-home-tile { border-radius:15px; padding:12px; }
+.as-home-tile>span { display:grid; place-items:center; width:42px; height:42px; border-radius:13px; background:#e5f5fa; font-size:24px; }
+.as-home-tile:nth-child(2)>span { background:#fff0ee; }
+.as-home-disclaimer,.info-strip { background:#e8f3fa; color:#3c617c; border:1px solid #d5e7f4; }
+/* Distinción clara entre comunicaciones sanitarias y fuentes externas */
+#view-alertas .paper { padding:15px; margin:10px 0; }
+#view-alertas .paper h2 { color:#123b5b; font-size:17px; }
+#view-alertas .paper:first-of-type { border-top:3px solid #078b8b; }
+#view-alertas .paper:nth-of-type(2) { border-top:3px solid #2c79bf; }
+#view-alertas .paper p { color:#526b7e; }
+/* Mapa y directorio: conservar dimensiones funcionales de Leaflet */
+.map-controls select,.care-filter-row select { background:#fff; border-color:#bdd6e5; border-radius:11px; }
+.care-item { background:#f8fcfe; border-color:#d9e9f0; border-radius:12px; }
+#territoryMap { border-radius:12px; }
+/* Salud y Más */
+.health-card { background:#f2f9ff; border-color:#d7eaf8; }
+.advice { border-left:3px solid #0d8991; }
+.menu-list { overflow:hidden; }
+.menu-list button,.menu-list a { border-bottom-color:#e6eef4; }
+.menu-list button:hover,.menu-list a:hover { background:#f0f8fc; }
+.primary { background:#086bb8; color:#fff; }
+.primary:hover { background:#075b9b; }
+.secondary { background:#e7f3fb; color:#155e88; }
+/* Navegación inferior compacta */
+.bottom-nav { background:#fff; border-top:1px solid #dce8f0; box-shadow:0 -4px 16px #133d5710; }
+.nav-item { background:transparent; color:#5b7489; border-radius:11px; }
+.nav-item.active { background:#e7f5fa; color:#0873a8; }
+.nav-item span { font-size:21px; }
+/* Diálogos y accesibilidad */
+dialog:not(.as-emergency) { border:1px solid #d3e2eb; box-shadow:0 18px 65px #061f3540; }
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible { outline:3px solid #0a84b8; outline-offset:2px; }
+/* Las alarmas críticas NO reciben modificaciones visuales globales. */
+@media (min-width:700px) { .shell { margin:12px auto; border-radius:18px; overflow:clip; } }
+@media (max-width:380px) { main { padding:11px 10px 20px; } .top { padding:12px; } .brand strong { font-size:18px; } .as-home-stat strong { font-size:22px; } }
+@media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; transition-duration:0.01ms!important; animation-duration:0.01ms!important; } }
