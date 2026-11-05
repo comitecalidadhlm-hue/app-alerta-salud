@@ -6,13 +6,15 @@
 
 "use strict";
 
-const CACHE = "alerta-salud-v1-11-6-identidad-visual";
+const CACHE = "alerta-salud-v1-11-7-identidad-instalacion";
 
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./identidad.js",
+  "./instalacion.js",
   "./map.js",
   "./care.js",
   "./inicio.js",
