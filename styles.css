@@ -340,3 +340,22 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 
 /* Identidad visual AlertaSalud V1.11.6 */
 .brand-logo{width:45px;height:45px;object-fit:cover;border-radius:12px;flex-shrink:0}
+
+/* V1.11.9 - Cabecera institucional horizontal, sin miniaturas. */
+.shell .top.as-header-banner {
+  position:relative;display:block;padding:0;min-height:0;height:auto;
+  overflow:hidden;background:#063b79;line-height:0;
+}
+.as-header-banner .as-banner-logo {
+  display:block;width:100%;height:auto;max-width:100%;object-fit:contain;
+  border:0;border-radius:0;
+}
+.as-header-banner .as-banner-settings {
+  position:absolute;right:7px;bottom:7px;z-index:2;
+  width:30px;height:30px;min-width:30px;min-height:30px;
+  line-height:1;border:1px solid #ffffff77;border-radius:9px;
+  color:white;background:#006b8bcf;backdrop-filter:blur(3px);
+}
+@media (max-width:380px) {
+  .as-header-banner .as-banner-settings {width:27px;height:27px;min-width:27px;min-height:27px;right:5px;bottom:5px}
+}
