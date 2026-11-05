@@ -6,7 +6,7 @@
 
 "use strict";
 
-const CACHE = "alerta-salud-v1-11-7-identidad-instalacion";
+const CACHE = "alerta-salud-v1-11-8-identidad-remota";
 
 const ASSETS = [
   "./",
