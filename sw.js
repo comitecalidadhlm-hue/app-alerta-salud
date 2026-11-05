@@ -6,7 +6,7 @@
 
 "use strict";
 
-const CACHE = "alerta-salud-v1-11-5-version-visible";
+const CACHE = "alerta-salud-v1-11-6-identidad-visual";
 
 const ASSETS = [
   "./",
@@ -23,7 +23,10 @@ const ASSETS = [
   "./emergencia.js",
   "./supabase-config.js",
   "./manifest.webmanifest",
-  "./icon.svg"
+  "./icon.svg",
+  "./icon-192.png",
+  "./icon-512.png",
+  "./logo-alertasalud.png"
 ];
 
 self.addEventListener("install", event => {
