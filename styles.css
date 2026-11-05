@@ -337,3 +337,6 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 @media (prefers-contrast: more) {
   .as-version-label { color: #17354b; }
 }
+
+/* Identidad visual AlertaSalud V1.11.6 */
+.brand-logo{width:45px;height:45px;object-fit:cover;border-radius:12px;flex-shrink:0}.as-brand-poster{max-width:270px;margin:0 auto 18px}.as-brand-poster img{display:block;width:100%;height:auto;border-radius:18px;box-shadow:0 8px 22px #123c6020}
