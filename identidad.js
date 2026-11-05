@@ -1,21 +1,26 @@
-/* Alerta Salud - identidad visual remota con respaldo local.
-   Para actualizar el logo desde un futuro Dashboard: subir una imagen PNG
-   al bucket PUBLICO 'alerta-salud-assets', ruta 'branding/logo.png'.
-   Si no existe, se conserva la imagen incluida en el repositorio.
-   No usar esta ruta para datos sensibles ni habilitar escrituras anonimas.
+/* AlertaSalud V1.11.8 — logo de cabecera desde Supabase Storage.
+   Ruta pública: alerta-salud-assets/branding/logo.png
+   El logo grande de Más opciones NO se muestra ni se actualiza.
+   La imagen local permanece como respaldo si no hay conexión o archivo remoto.
+   Actualización del logo visible: al iniciar, como máximo una consulta por hora.
+   No altera los iconos del sistema operativo de una PWA instalada.
 */
-(()=>{'use strict';
-const base=window.ALERTA_SUPABASE?.url;
-if(!base)return;
-const remote=base+'/storage/v1/object/public/alerta-salud-assets/branding/logo.png';
-const stamp=Math.floor(Date.now()/3600000);
-const candidate=remote+'?revision='+stamp;
-const targets=[...document.querySelectorAll('.brand-logo, .as-brand-poster img')];
-if(!targets.length)return;
-const probe=new Image();
-probe.onload=()=>{if(probe.naturalWidth<32||probe.naturalHeight<32)return;
- targets.forEach(img=>{img.dataset.logoFallback=img.getAttribute('src')||'';img.src=candidate;
- img.addEventListener('error',()=>{if(img.dataset.logoFallback)img.src=img.dataset.logoFallback},{once:true});});};
-probe.onerror=()=>{};
-probe.src=candidate;
+(() => {
+  "use strict";
+  const base = window.ALERTA_SUPABASE?.url;
+  if (!base || !/^https:\/\//.test(base)) return;
+  const logo = document.querySelector("header .brand-logo, .brand-logo");
+  if (!logo) return;
+  const fallback = logo.getAttribute("src") || "./icon-192.png";
+  const remote = base.replace(/\/$/, "") +
+    "/storage/v1/object/public/alerta-salud-assets/branding/logo.png";
+  const candidate = remote + "?revision=" + Math.floor(Date.now() / 3600000);
+  const probe = new Image();
+  probe.onload = () => {
+    if (probe.naturalWidth < 32 || probe.naturalHeight < 32) return;
+    logo.onerror = () => { logo.onerror = null; logo.src = fallback; };
+    logo.src = candidate;
+  };
+  probe.onerror = () => {};
+  probe.src = candidate;
 })();
