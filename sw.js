@@ -6,7 +6,7 @@
 
 "use strict";
 
-const CACHE = "alerta-salud-v1-11-8-identidad-remota";
+const CACHE = "alerta-salud-v1-11-9-cabecera-horizontal";
 
 const ASSETS = [
   "./",
@@ -28,7 +28,8 @@ const ASSETS = [
   "./icon.svg",
   "./icon-192.png",
   "./icon-512.png",
-  "./logo-alertasalud.png"
+  "./logo-alertasalud.png",
+  "./logo-horizontal.png"
 ];
 
 self.addEventListener("install", event => {
