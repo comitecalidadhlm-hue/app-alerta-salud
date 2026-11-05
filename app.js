@@ -12,7 +12,7 @@ function renderTopic(key){const t=topics[key];$('advice').replaceChildren();cons
 function info(title,message){$('infoTitle').textContent=title;$('infoMessage').textContent=message;$('infoDialog').showModal()}
 $('menuNotifications').addEventListener('click',()=>info('Notificaciones','Las notificaciones push no están activas en esta versión. Se implementarán al disponer de una fuente verificada y un sistema de suscripciones.'));
 $('menuHistory').addEventListener('click',()=>info('Historial','El historial estará disponible cuando se conecte el servicio de alertas. No se mostrarán eventos ficticios como reales.'));
-let installPrompt=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e});$('menuInstall').addEventListener('click',async()=>{if(installPrompt){installPrompt.prompt();await installPrompt.userChoice;installPrompt=null}else info('Instalar Alerta Salud','En Android, usá el menú del navegador y elegí Instalar app o Agregar a pantalla principal. En iPhone, abrí la web en Safari, tocá Compartir y elegí Agregar a inicio. Se requiere publicación por HTTPS para instalarla correctamente.')});
+// Instalación PWA: gestionada por instalacion.js.
 
 // Lectura publica con RLS: no incluye claves privadas ni operaciones de escritura.
 async function fetchPublic(table,params=''){
