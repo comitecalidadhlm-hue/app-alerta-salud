@@ -6,7 +6,7 @@
 
 "use strict";
 
-const CACHE = "alerta-salud-v1-11-4-territorial";
+const CACHE = "alerta-salud-v1-11-5-version-visible";
 
 const ASSETS = [
   "./",
